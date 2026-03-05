@@ -252,6 +252,7 @@ class FeishuChannel(BaseChannel):
         self._ws_thread: threading.Thread | None = None
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._user_name_cache: dict[str, str] = {}
 
     async def start(self) -> None:
         """Start the Feishu bot with WebSocket long connection."""
@@ -591,6 +592,60 @@ class FeishuChannel(BaseChannel):
 
         return None, f"[{msg_type}: download failed]"
 
+    def _get_user_name_sync(self, open_id: str) -> str:
+        """Look up a user's display name by open_id, with in-memory cache."""
+        if open_id in self._user_name_cache:
+            return self._user_name_cache[open_id]
+        try:
+            from lark_oapi.api.contact.v3 import GetUserRequest as ContactGetUserRequest
+            request = ContactGetUserRequest.builder() \
+                .user_id(open_id) \
+                .user_id_type("open_id") \
+                .build()
+            response = self._client.contact.v3.user.get(request)
+            if response.success() and response.data and response.data.user:
+                name = response.data.user.name or ""
+                self._user_name_cache[open_id] = name
+                return name
+        except Exception as e:
+            logger.debug("Failed to fetch user name for {}: {}", open_id, e)
+        self._user_name_cache[open_id] = ""
+        return ""
+
+    def _get_message_sync(self, message_id: str) -> dict | None:
+        """Fetch a message by ID and return its msg_type and body content."""
+        try:
+            request = GetMessageRequest.builder() \
+                .message_id(message_id) \
+                .build()
+            response = self._client.im.v1.message.get(request)
+            if response.success() and response.data and response.data.items:
+                msg = response.data.items[0]
+                body_content = msg.body.content if msg.body else None
+                if body_content:
+                    return {"msg_type": msg.msg_type, "content": body_content}
+        except Exception as e:
+            logger.warning("Failed to fetch message {}: {}", message_id, e)
+        return None
+
+    @staticmethod
+    def _extract_message_text(msg_type: str, content_str: str) -> str:
+        """Extract plain text from a fetched message's body content."""
+        try:
+            content_json = json.loads(content_str)
+        except (json.JSONDecodeError, TypeError):
+            return content_str or ""
+        if msg_type == "text":
+            return content_json.get("text", "")
+        elif msg_type == "post":
+            return _extract_post_text(content_json)
+        elif msg_type == "interactive":
+            parts = _extract_interactive_content(content_json)
+            return "\n".join(parts)
+        elif msg_type in ("image", "audio", "file", "sticker"):
+            return MSG_TYPE_MAP.get(msg_type, f"[{msg_type}]")
+        return f"[{msg_type}]"
+
     def _send_message_sync(self, receive_id_type: str, receive_id: str, msg_type: str, content: str) -> bool:
         """Send a single message (text/image/file/interactive) synchronously."""
         from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
@@ -692,8 +747,35 @@ class FeishuChannel(BaseChannel):
             chat_type = message.chat_type
             msg_type = message.message_type
 
+            loop = asyncio.get_running_loop()
+            sender_name = await loop.run_in_executor(
+                None, self._get_user_name_sync, sender_id,
+            ) if sender_id != "unknown" else ""
+
             # Add reaction
             await self._add_reaction(message_id, self.config.react_emoji)
+
+            # Build mention key-to-name map (e.g. "@_user_1" -> "@张三")
+            mention_map: dict[str, str] = {}
+            if message.mentions:
+                for m in message.mentions:
+                    if m.key and m.name:
+                        mention_map[m.key] = f"@{m.name}"
+
+            # Fetch quoted message content when replying/quoting
+            quote_text = ""
+            if message.parent_id:
+                loop = asyncio.get_running_loop()
+                parent_data = await loop.run_in_executor(
+                    None, self._get_message_sync, message.parent_id
+                )
+                if parent_data:
+                    raw = self._extract_message_text(
+                        parent_data["msg_type"], parent_data["content"]
+                    )
+                    if raw:
+                        quoted_lines = "\n".join(f"> {line}" for line in raw.splitlines())
+                        quote_text = quoted_lines + "\n"
 
             # Parse content
             content_parts = []
@@ -739,6 +821,15 @@ class FeishuChannel(BaseChannel):
 
             content = "\n".join(content_parts) if content_parts else ""
 
+            # Replace mention placeholders with display names
+            if mention_map:
+                for key, display in mention_map.items():
+                    content = content.replace(key, display)
+
+            # Prepend quoted message
+            if quote_text:
+                content = quote_text + content
+
             if not content and not media_paths:
                 return
 
@@ -753,6 +844,7 @@ class FeishuChannel(BaseChannel):
                     "message_id": message_id,
                     "chat_type": chat_type,
                     "msg_type": msg_type,
+                    "sender_name": sender_name,
                 }
             )
 
