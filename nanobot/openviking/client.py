@@ -50,21 +50,17 @@ class VikingClient:
             ov_data_path = Path(data_dir).expanduser()
             ov_data_path.mkdir(parents=True, exist_ok=True)
 
-            init_kwargs: dict[str, Any] = {"path": str(ov_data_path)}
-            if vlm_api_key and vlm_base_url and vlm_model:
-                init_kwargs["vlm"] = {
-                    "api_key": vlm_api_key,
-                    "base_url": vlm_base_url,
-                    "model": vlm_model,
-                }
-            if embedding_model and embedding_api_key and embedding_base_url:
-                init_kwargs["embedding"] = {
-                    "model": embedding_model,
-                    "api_key": embedding_api_key,
-                    "base_url": embedding_base_url,
-                }
+            self._ensure_ov_config(
+                str(ov_data_path),
+                embedding_model=embedding_model,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                vlm_api_key=vlm_api_key,
+                vlm_base_url=vlm_base_url,
+                vlm_model=vlm_model,
+            )
 
-            self.client = ov.AsyncOpenViking(**init_kwargs)
+            self.client = ov.AsyncOpenViking(path=str(ov_data_path))
             self.agent_space_name = self.client.user.agent_space_name()
         else:
             self.client = ov.AsyncHTTPClient(
@@ -75,6 +71,63 @@ class VikingClient:
             self.agent_space_name = hashlib.md5(
                 (self.user_id + (agent_id or "")).encode()
             ).hexdigest()[:12]
+
+    @staticmethod
+    def _ensure_ov_config(
+        workspace: str,
+        *,
+        embedding_model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        vlm_api_key: str,
+        vlm_base_url: str,
+        vlm_model: str,
+    ) -> None:
+        """Pre-seed the OpenViking config singleton so ov.conf is not required.
+
+        If a config file (``~/.openviking/ov.conf`` or ``$OPENVIKING_CONFIG_FILE``)
+        already exists the SDK will load it normally. This method only kicks in
+        when no file is found, building the config dict from the parameters that
+        nanobot already knows about and injecting it via the SDK singleton.
+        """
+        try:
+            from openviking_cli.utils.config import (
+                OpenVikingConfigSingleton,
+                resolve_config_path,
+                DEFAULT_OV_CONF,
+                OPENVIKING_CONFIG_ENV,
+            )
+        except ImportError:
+            return
+
+        existing = resolve_config_path(None, OPENVIKING_CONFIG_ENV, DEFAULT_OV_CONF)
+        if existing is not None:
+            return
+
+        config_dict: dict[str, Any] = {
+            "storage": {"workspace": workspace},
+        }
+
+        if embedding_model and embedding_api_key and embedding_base_url:
+            config_dict["embedding"] = {
+                "dense": {
+                    "provider": "openai",
+                    "model": embedding_model,
+                    "api_key": embedding_api_key,
+                    "api_base": embedding_base_url,
+                }
+            }
+
+        if vlm_api_key and vlm_base_url and vlm_model:
+            config_dict["vlm"] = {
+                "provider": "openai",
+                "model": vlm_model,
+                "api_key": vlm_api_key,
+                "api_base": vlm_base_url,
+            }
+
+        OpenVikingConfigSingleton.initialize(config_dict=config_dict)
+        logger.info("OpenViking config bootstrapped from nanobot parameters (no ov.conf)")
 
     async def _initialize(self) -> None:
         await self.client.initialize()
