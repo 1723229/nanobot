@@ -21,31 +21,31 @@ if str(AUTH_SCRIPT_DIR) not in sys.path:
 
 
 def load_config():
-    """加载飞书配置"""
-    # 尝试多个路径（优先新的统一配置）
+    """加载飞书配置（凭据从系统环境变量读取）"""
+    import os
     possible_paths = [
-        Path.home() / '.nanobot' / '.env',  # 新的统一配置
+        Path.home() / '.nanobot' / '.env',
         Path(__file__).parent.parent.parent.parent / "feishu-config.env",
-        Path("~/.nanobot/workspace/skills/feishu-doc-orchestrator/feishu-config.env"),
         Path(".claude/feishu-config.env"),
         Path("../feishu-config.env"),
         Path("../../feishu-config.env"),
     ]
     
-    config_path = None
+    config = {}
     for p in possible_paths:
         if p.exists():
-            config_path = p
+            with open(p, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        k = key.strip()
+                        if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
+                            config[k] = value.strip().strip('"\'')
             break
-
-    config = {}
-    if config_path and config_path.exists():
-        with open(config_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip().strip('"\'')
+    
+    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
+    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
     return config
 
 

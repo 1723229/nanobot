@@ -12,27 +12,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-# 配置路径 - 小爪专属配置
-CONFIG_PATH = Path.home() / '.nanobot' / '.env'
-
-
 def load_config():
-    """
-    加载小爪的飞书配置
-    从 ~/.nanobot/.env 读取
-    """
-    config = {}
-    
-    if CONFIG_PATH.exists():
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip().strip('"\'')
-    else:
-        raise Exception(f"配置文件不存在: {CONFIG_PATH}")
-    
+    """从系统环境变量加载飞书凭据"""
+    config = {
+        'FEISHU_APP_ID': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', ''),
+        'FEISHU_APP_SECRET': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', ''),
+    }
+    if not config['FEISHU_APP_ID'] or not config['FEISHU_APP_SECRET']:
+        raise Exception("缺少飞书凭据，请设置环境变量 NANOBOT_CHANNELS__FEISHU__APP_ID / NANOBOT_CHANNELS__FEISHU__APP_SECRET")
     return config
 
 

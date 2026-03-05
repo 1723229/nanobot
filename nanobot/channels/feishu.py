@@ -284,41 +284,36 @@ class FeishuChannel(BaseChannel):
             self._on_message_sync
         ).build()
 
-        # Start WebSocket client in a dedicated thread.
-        # The lark SDK's ws module captures asyncio.get_event_loop() at
-        # import time, grabbing the *main* loop.  Client.start() then calls
-        # loop.run_until_complete() which fails because that loop is already
-        # running.  We fix this by patching the module-level ``loop`` to a
-        # fresh event loop created inside the daemon thread, *before* the
-        # first Client instance is constructed.
+        # Create WebSocket client for long connection
+        self._ws_client = lark.ws.Client(
+            self.config.app_id,
+            self.config.app_secret,
+            event_handler=event_handler,
+            log_level=lark.LogLevel.INFO
+        )
+
+        # Start WebSocket client in a separate thread with reconnect loop.
+        # A dedicated event loop is created for this thread so that lark_oapi's
+        # module-level `loop = asyncio.get_event_loop()` picks up an idle loop
+        # instead of the already-running main asyncio loop, which would cause
+        # "This event loop is already running" errors.
         def run_ws():
-            import lark_oapi.ws.client as _ws_mod
-
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            _ws_mod.loop = new_loop
-
-            self._ws_client = lark.ws.Client(
-                self.config.app_id,
-                self.config.app_secret,
-                event_handler=event_handler,
-                log_level=lark.LogLevel.INFO,
-            )
-
-            while self._running:
-                try:
-                    self._ws_client.start()
-                except Exception as e:
-                    logger.warning("Feishu WebSocket error: {}", e)
-                if self._running:
-                    import time
-                    time.sleep(5)
-                    self._ws_client = lark.ws.Client(
-                        self.config.app_id,
-                        self.config.app_secret,
-                        event_handler=event_handler,
-                        log_level=lark.LogLevel.INFO,
-                    )
+            import time
+            import lark_oapi.ws.client as _lark_ws_client
+            ws_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(ws_loop)
+            # Patch the module-level loop used by lark's ws Client.start()
+            _lark_ws_client.loop = ws_loop
+            try:
+                while self._running:
+                    try:
+                        self._ws_client.start()
+                    except Exception as e:
+                        logger.warning("Feishu WebSocket error: {}", e)
+                    if self._running:
+                        time.sleep(5)
+            finally:
+                ws_loop.close()
 
         self._ws_thread = threading.Thread(target=run_ws, daemon=True)
         self._ws_thread.start()

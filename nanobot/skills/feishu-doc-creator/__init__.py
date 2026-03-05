@@ -14,17 +14,22 @@ from typing import Dict, Optional
 
 def load_config():
     """加载飞书配置"""
-    config_path = Path.home() / '.claude' / 'feishu-config.env'
-    if not config_path.exists():
-        raise FileNotFoundError(f"配置文件不存在: {config_path}")
-    
+    import os
     config = {}
-    with open(config_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                config[key.strip()] = value.strip().strip('"\'')
+    # 非敏感配置仍从文件读取
+    config_path = Path.home() / '.claude' / 'feishu-config.env'
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    k = key.strip()
+                    if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
+                        config[k] = value.strip().strip('"\'')
+    # 凭据只从系统环境变量读取
+    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
+    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
     return config
 
 

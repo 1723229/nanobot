@@ -42,20 +42,8 @@ class VideoUnderstandingSkill:
         self.temp_dir = Path(temp_dir) if temp_dir else self.workspace / 'temp' / 'video_processing'
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         
-        # 从 .env 文件读取配置
-        env_path = Path.home() / '.nanobot' / '.env'
-        env_config = {}
-        if env_path.exists():
-            with open(env_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        env_config[key.strip()] = value.strip().strip('"\'')
-        
-        # 飞书配置（从 .env 或环境变量读取）
-        self.feishu_app_id = os.getenv("FEISHU_APP_ID")
-        self.feishu_app_secret = os.getenv("FEISHU_APP_SECRET")
+        self.feishu_app_id = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_ID")
+        self.feishu_app_secret = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_SECRET")
         
         # 检查依赖
         self.deps = self._check_dependencies()

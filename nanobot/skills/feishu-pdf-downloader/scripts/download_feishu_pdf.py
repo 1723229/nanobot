@@ -32,13 +32,9 @@ def get_tenant_token(app_id, app_secret):
 
 def download_file(file_token, output_path, tenant_token=None):
     """Download file from Feishu drive"""
-    # Load credentials if token not provided
     if not tenant_token:
-        load_env_file(os.path.expanduser('~/.nanobot/.env'))
-        load_env_file(os.path.expanduser('~/.nanobot/config/main.env'))
-        
-        app_id = os.getenv("FEISHU_APP_ID")
-        app_secret = os.getenv("FEISHU_APP_SECRET")
+        app_id = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_ID")
+        app_secret = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_SECRET")
         
         if not app_id or not app_secret:
             print("Error: FEISHU_APP_ID or FEISHU_APP_SECRET not set", file=sys.stderr)

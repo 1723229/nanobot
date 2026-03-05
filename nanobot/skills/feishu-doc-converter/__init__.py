@@ -5,6 +5,7 @@ Feishu Document Converter - 文档格式转换
 支持：文档→MD，URL→MD
 """
 
+import os
 import re
 import json
 import requests
@@ -12,9 +13,15 @@ from pathlib import Path
 from typing import Dict, Optional
 
 
+def _inject_feishu_credentials(config: dict) -> dict:
+    """从系统环境变量注入飞书凭据"""
+    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
+    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
+    return config
+
+
 def load_config():
-    """加载飞书配置（优先从 config/ 目录读取新的 JSON 配置）"""
-    # 首先尝试新的 JSON 配置路径
+    """加载飞书配置（非敏感配置从 JSON/env 文件读取，凭据从系统环境变量读取）"""
     json_config_paths = [
         Path(__file__).parent.parent.parent / "config" / "feishu.json",
         Path.home() / '.nanobot' / 'workspace' / 'config' / 'feishu.json',
@@ -25,7 +32,6 @@ def load_config():
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
                     json_config = json.load(f)
-                # 将 JSON 配置映射到旧的配置格式
                 config = {}
                 if 'api' in json_config and 'domain' in json_config['api']:
                     config['FEISHU_API_DOMAIN'] = json_config['api']['domain']
@@ -45,33 +51,23 @@ def load_config():
                 if 'drive' in json_config and 'defaultFolder' in json_config['drive']:
                     config['FEISHU_DEFAULT_FOLDER'] = json_config['drive']['defaultFolder']
                     config['FEISHU_DRIVE_FOLDER_TOKEN'] = json_config['drive']['defaultFolder']
-                # 从 .env 补充敏感信息
-                env_path = Path.home() / '.nanobot' / '.env'
-                if env_path.exists():
-                    with open(env_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if line and not line.startswith('#') and '=' in line:
-                                key, value = line.split('=', 1)
-                                if key.strip() in ['FEISHU_APP_ID', 'FEISHU_APP_SECRET']:
-                                    config[key.strip()] = value.strip().strip('"\'')
-                return config
+                return _inject_feishu_credentials(config)
             except Exception as e:
                 print(f"[Warning] 读取 JSON 配置失败: {e}, 尝试回退到旧配置")
     
-    # 回退到旧的 .env 配置
-    config_path = Path.home() / '.claude' / 'feishu-config.env'
-    if not config_path.exists():
-        raise FileNotFoundError(f"配置文件不存在: {config_path}")
-    
+    # 回退：从 .env 读取非敏感配置
     config = {}
-    with open(config_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                config[key.strip()] = value.strip().strip('"\'')
-    return config
+    config_path = Path.home() / '.claude' / 'feishu-config.env'
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    k = key.strip()
+                    if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
+                        config[k] = value.strip().strip('"\'')
+    return _inject_feishu_credentials(config)
 
 
 def get_access_token(config: Dict) -> str:

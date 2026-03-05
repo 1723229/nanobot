@@ -11,10 +11,9 @@ import argparse
 import sys
 from pathlib import Path
 
-# 配置信息 - 从环境变量读取
 import os
-APP_ID = os.getenv("FEISHU_APP_ID")
-APP_SECRET = os.getenv("FEISHU_APP_SECRET")
+APP_ID = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_ID")
+APP_SECRET = os.getenv("NANOBOT_CHANNELS__FEISHU__APP_SECRET")
 
 
 def get_tenant_access_token(app_id: str, app_secret: str) -> str:
@@ -103,7 +102,7 @@ def get_thread_messages(thread_id: str, token: str = None) -> list:
         raise Exception(f"获取话题消息失败: {result}")
 
 
-def delete_thread_messages(thread_id: str, my_sender_id: str = os.getenv("FEISHU_APP_ID", ""), token: str = None) -> dict:
+def delete_thread_messages(thread_id: str, my_sender_id: str = None, token: str = None) -> dict:
     """
     批量删除话题中我发送的所有消息
     
@@ -115,6 +114,8 @@ def delete_thread_messages(thread_id: str, my_sender_id: str = os.getenv("FEISHU
     Returns:
         删除结果统计
     """
+    if my_sender_id is None:
+        my_sender_id = APP_ID or ""
     if not token:
         token = get_tenant_access_token(APP_ID, APP_SECRET)
     

@@ -15,23 +15,29 @@ import requests
 
 
 def load_config():
-    """加载飞书配置（优先统一配置）"""
-    # 优先尝试新的统一配置路径
-    config_path = Path.home() / '.nanobot' / '.env'
-    if not config_path.exists():
-        # 兼容旧路径
-        config_path = Path(__file__).parent.parent.parent.parent / "feishu-config.env"
-        if not config_path.exists():
-            config_path = Path(".claude/feishu-config.env")
+    """加载飞书配置（凭据从系统环境变量读取）"""
+    import os
+    possible_paths = [
+        Path.home() / '.nanobot' / '.env',
+        Path(__file__).parent.parent.parent.parent / "feishu-config.env",
+        Path(".claude/feishu-config.env"),
+    ]
 
     config = {}
-    if config_path.exists():
-        with open(config_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip().strip('"\'')
+    for p in possible_paths:
+        if p.exists():
+            with open(p, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        k = key.strip()
+                        if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
+                            config[k] = value.strip().strip('"\'')
+            break
+    
+    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
+    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
     return config
 
 
