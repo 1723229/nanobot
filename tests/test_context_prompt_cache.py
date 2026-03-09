@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime as real_datetime
+from importlib.resources import files as pkg_files
 from pathlib import Path
 import datetime as datetime_module
 
@@ -26,8 +27,14 @@ def _make_workspace(tmp_path: Path) -> Path:
     return workspace
 
 
-@pytest.mark.asyncio
-async def test_system_prompt_stays_stable_when_clock_changes(tmp_path, monkeypatch) -> None:
+def test_bootstrap_files_are_backed_by_templates() -> None:
+    template_dir = pkg_files("nanobot") / "templates"
+
+    for filename in ContextBuilder.BOOTSTRAP_FILES:
+        assert (template_dir / filename).is_file(), f"missing bootstrap template: {filename}"
+
+
+def test_system_prompt_stays_stable_when_clock_changes(tmp_path, monkeypatch) -> None:
     """System prompt should not change just because wall clock minute changes."""
     monkeypatch.setattr(datetime_module, "datetime", _FakeDatetime)
 

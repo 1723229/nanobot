@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
     def __init__(self, workspace: Path, viking_client: VikingClient | None = None):
@@ -94,6 +94,20 @@ Skills with available="false" need dependencies installed first - you can try in
 - OpenViking workspace: managed via OpenViking tools (openviking_read, openviking_search, user_memory_search, etc.)
 - Memory recall: use user_memory_search tool for semantic memory, or grep memory/HISTORY.md for keyword search
 - Memory commit: use openviking_memory_commit tool to persist important conversations"""
+        platform_policy = ""
+        if system == "Windows":
+            platform_policy = """## Platform Policy (Windows)
+- You are running on Windows. Do not assume GNU tools like `grep`, `sed`, or `awk` exist.
+- Prefer Windows-native commands or file tools when they are more reliable.
+- If terminal output is garbled, retry with UTF-8 output enabled.
+"""
+        else:
+            platform_policy = """## Platform Policy (POSIX)
+- You are running on a POSIX system. Prefer UTF-8 and standard shell tools.
+- Use file tools when they are simpler or more reliable than shell commands.
+"""
+
+        return f"""# nanobot 🐈
 
         return f"""# hiperone_bot 🐈
 
@@ -109,6 +123,9 @@ Your workspace is at: {workspace_path}
 - Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md{ov_section}
 
 ## hiperone_bot Guidelines
+{platform_policy}
+
+## nanobot Guidelines
 - State intent before tool calls, but NEVER predict or claim results before receiving them.
 - Before modifying a file, read it first. Do not assume files or directories exist.
 - After writing or editing a file, re-read it if accuracy matters.
