@@ -21,31 +21,20 @@ if str(AUTH_SCRIPT_DIR) not in sys.path:
 
 
 def load_config():
-    """加载飞书配置（凭据从系统环境变量读取）"""
+    """从环境变量加载飞书配置"""
     import os
-    possible_paths = [
-        Path.home() / '.hiperone' / '.env',
-        Path(__file__).parent.parent.parent.parent / "feishu-config.env",
-        Path(".claude/feishu-config.env"),
-        Path("../feishu-config.env"),
-        Path("../../feishu-config.env"),
-    ]
-    
-    config = {}
-    for p in possible_paths:
-        if p.exists():
-            with open(p, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        k = key.strip()
-                        if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
-                            config[k] = value.strip().strip('"\'')
-            break
-    
-    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
-    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
+    config = {
+        'FEISHU_APP_ID': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', ''),
+        'FEISHU_APP_SECRET': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', ''),
+        'FEISHU_API_DOMAIN': os.environ.get('FEISHU_API_DOMAIN', 'https://open.feishu.cn'),
+        'FEISHU_WIKI_SPACE_ID': os.environ.get('FEISHU_WIKI_SPACE_ID', '7313882962775556100'),
+        'FEISHU_WIKI_PARENT_NODE': os.environ.get('FEISHU_WIKI_PARENT_NODE', 'Uqsqwoug5iYca3koiAQcUaEqnOf'),
+        'FEISHU_AUTO_COLLABORATOR_ID': os.environ.get('FEISHU_AUTO_COLLABORATOR_ID', ''),
+        'FEISHU_AUTO_COLLABORATOR_TYPE': os.environ.get('FEISHU_AUTO_COLLABORATOR_TYPE', 'openid'),
+        'FEISHU_AUTO_COLLABORATOR_PERM': os.environ.get('FEISHU_AUTO_COLLABORATOR_PERM', 'full_access'),
+    }
+    if not config['FEISHU_APP_ID'] or not config['FEISHU_APP_SECRET']:
+        raise Exception("缺少飞书凭据，请设置环境变量 NANOBOT_CHANNELS__FEISHU__APP_ID / NANOBOT_CHANNELS__FEISHU__APP_SECRET")
     return config
 
 

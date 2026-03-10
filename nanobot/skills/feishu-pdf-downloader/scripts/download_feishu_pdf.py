@@ -5,21 +5,8 @@ Usage: python3 download_feishu_pdf.py <file_token> [output_path]
 """
 import os
 import sys
-import re
 import requests
 
-def load_env_file(path):
-    """Load env file with KEY = "value" or KEY=value format"""
-    if not os.path.exists(path):
-        return
-    with open(path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            match = re.match(r'^(\w+)\s*=\s*["\']?(.+?)["\']?\s*$', line)
-            if match:
-                os.environ[match.group(1)] = match.group(2)
 
 def get_tenant_token(app_id, app_secret):
     """Get Feishu tenant access token"""

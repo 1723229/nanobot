@@ -7,67 +7,21 @@ Feishu Document Converter - 文档格式转换
 
 import os
 import re
-import json
 import requests
-from pathlib import Path
 from typing import Dict, Optional
 
 
-def _inject_feishu_credentials(config: dict) -> dict:
-    """从系统环境变量注入飞书凭据"""
-    config['FEISHU_APP_ID'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', '')
-    config['FEISHU_APP_SECRET'] = os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', '')
-    return config
-
-
 def load_config():
-    """加载飞书配置（非敏感配置从 JSON/env 文件读取，凭据从系统环境变量读取）"""
-    json_config_paths = [
-        Path(__file__).parent.parent.parent / "config" / "feishu.json",
-        Path.home() / '.hiperone' / 'workspace' / 'config' / 'feishu.json',
-    ]
-    
-    for json_path in json_config_paths:
-        if json_path.exists():
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    json_config = json.load(f)
-                config = {}
-                if 'api' in json_config and 'domain' in json_config['api']:
-                    config['FEISHU_API_DOMAIN'] = json_config['api']['domain']
-                if 'app' in json_config and 'autoCollaboratorId' in json_config['app']:
-                    config['FEISHU_AUTO_COLLABORATOR_ID'] = json_config['app']['autoCollaboratorId']
-                if 'wiki' in json_config:
-                    if 'spaceId' in json_config['wiki']:
-                        config['FEISHU_WIKI_SPACE_ID'] = json_config['wiki']['spaceId']
-                    if 'parentNodes' in json_config['wiki']:
-                        nodes = json_config['wiki']['parentNodes']
-                        if 'dailyReport' in nodes:
-                            config['FEISHU_PARENT_DAILY_REPORT'] = nodes['dailyReport']
-                        if 'other' in nodes:
-                            config['FEISHU_PARENT_OTHER'] = nodes['other']
-                        if 'deepObservation' in nodes:
-                            config['FEISHU_PARENT_DEEP_OBSERVATION'] = nodes['deepObservation']
-                if 'drive' in json_config and 'defaultFolder' in json_config['drive']:
-                    config['FEISHU_DEFAULT_FOLDER'] = json_config['drive']['defaultFolder']
-                    config['FEISHU_DRIVE_FOLDER_TOKEN'] = json_config['drive']['defaultFolder']
-                return _inject_feishu_credentials(config)
-            except Exception as e:
-                print(f"[Warning] 读取 JSON 配置失败: {e}, 尝试回退到旧配置")
-    
-    # 回退：从 .env 读取非敏感配置
-    config = {}
-    config_path = Path.home() / '.claude' / 'feishu-config.env'
-    if config_path.exists():
-        with open(config_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    k = key.strip()
-                    if k not in ('FEISHU_APP_ID', 'FEISHU_APP_SECRET'):
-                        config[k] = value.strip().strip('"\'')
-    return _inject_feishu_credentials(config)
+    """从环境变量加载飞书配置"""
+    config = {
+        'FEISHU_APP_ID': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_ID', ''),
+        'FEISHU_APP_SECRET': os.environ.get('NANOBOT_CHANNELS__FEISHU__APP_SECRET', ''),
+        'FEISHU_API_DOMAIN': os.environ.get('FEISHU_API_DOMAIN', 'https://open.feishu.cn'),
+        'FEISHU_WIKI_SPACE_ID': os.environ.get('FEISHU_WIKI_SPACE_ID', '7313882962775556100'),
+    }
+    if not config['FEISHU_APP_ID'] or not config['FEISHU_APP_SECRET']:
+        raise Exception("缺少飞书凭据，请设置环境变量 NANOBOT_CHANNELS__FEISHU__APP_ID / NANOBOT_CHANNELS__FEISHU__APP_SECRET")
+    return config
 
 
 def get_access_token(config: Dict) -> str:
