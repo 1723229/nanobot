@@ -223,6 +223,42 @@ If logging something similar to an existing entry:
    - Missing automation (add to AGENTS.md)
    - Architectural problem (create tech debt ticket)
 
+## Simplify & Harden Feed
+
+Use this workflow to ingest recurring patterns from the `simplify-and-harden`
+skill and turn them into durable prompt guidance.
+
+### Ingestion Workflow
+
+1. Read `simplify_and_harden.learning_loop.candidates` from the task summary.
+2. For each candidate, use `pattern_key` as the stable dedupe key.
+3. Search `.learnings/LEARNINGS.md` for an existing entry with that key:
+   - `grep -n "Pattern-Key: <pattern_key>" .learnings/LEARNINGS.md`
+4. If found:
+   - Increment `Recurrence-Count`
+   - Update `Last-Seen`
+   - Add `See Also` links to related entries/tasks
+5. If not found:
+   - Create a new `LRN-...` entry
+   - Set `Source: simplify-and-harden`
+   - Set `Pattern-Key`, `Recurrence-Count: 1`, and `First-Seen`/`Last-Seen`
+
+### Promotion Rule (System Prompt Feedback)
+
+Promote recurring patterns into agent context/system prompt files when all are true:
+
+- `Recurrence-Count >= 3`
+- Seen across at least 2 distinct tasks
+- Occurred within a 30-day window
+
+Promotion targets:
+- `USER.md`
+- `AGENTS.md`
+- `SOUL.md` / `TOOLS.md` for workspace-level guidance when applicable
+
+Write promoted rules as short prevention rules (what to do before/while coding),
+not long incident write-ups.
+
 ## Periodic Review
 
 Review `.learnings/` at natural breakpoints:
@@ -232,6 +268,18 @@ Review `.learnings/` at natural breakpoints:
 - After completing a feature
 - When working in an area with past learnings
 - Weekly during active development
+
+### Quick Status Check
+```bash
+# Count pending items
+grep -h "Status\*\*: pending" .learnings/*.md | wc -l
+
+# List pending high-priority items
+grep -B5 "Priority\*\*: high" .learnings/*.md | grep "^## \["
+
+# Find learnings for a specific area
+grep -l "Area\*\*: backend" .learnings/*.md
+```
 
 ### Review Actions
 - Resolve fixed items
@@ -307,6 +355,22 @@ When a learning is valuable enough to become a reusable skill, extract it.
 3. **Customize SKILL.md**: Fill in with learning content (YAML frontmatter with `name` and `description`)
 4. **Update learning**: Set status to `promoted_to_skill`, add `Skill-Path`
 5. **Verify**: Ensure the skill is self-contained
+
+## Gitignore Options
+
+**Keep learnings local** (per-developer):
+```gitignore
+.learnings/
+```
+
+**Track learnings in repo** (team-wide):
+Don't add to .gitignore - learnings become shared knowledge.
+
+**Hybrid** (track templates, ignore entries):
+```gitignore
+.learnings/*.md
+!.learnings/.gitkeep
+```
 
 ## Best Practices
 

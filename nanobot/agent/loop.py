@@ -111,6 +111,7 @@ class AgentLoop:
         self.hook_manager = HookManager()
         if openviking_config and openviking_config.enabled:
             self._register_openviking_hooks()
+        self._register_self_improvement_hooks()
 
         self._running = False
         self._mcp_servers = mcp_servers or {}
@@ -152,6 +153,14 @@ class AgentLoop:
             register_openviking_hooks(self.hook_manager)
         except Exception:
             logger.exception("Failed to register OpenViking hooks")
+
+    def _register_self_improvement_hooks(self) -> None:
+        """Register self-improvement hooks for error detection."""
+        try:
+            from nanobot.hooks.self_improvement import register_self_improvement_hooks
+            register_self_improvement_hooks(self.hook_manager)
+        except Exception:
+            logger.exception("Failed to register self-improvement hooks")
 
     async def _ensure_viking_client(self) -> None:
         """Lazily create VikingClient and inject into ContextBuilder, tools, and hooks."""
