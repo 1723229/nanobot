@@ -362,7 +362,7 @@ class AgentLoop:
         if final_content is None and iteration >= self.max_iterations:
             logger.warning("Max iterations ({}) reached", self.max_iterations)
             final_content = (
-                f"当前任务较为复杂，已达到最大工具调用次数（{self.max_iterations}），未能完成全部操作。"
+                f"当前任务较为复杂，未能完成全部操作。"
                 "建议将任务拆分为更小的步骤后重试。"
             )
 
