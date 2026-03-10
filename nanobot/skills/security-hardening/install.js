@@ -23,7 +23,7 @@ function log(message, color = 'reset') {
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  workspace: process.env.nanobot_WORKSPACE || path.join(require('os').homedir(), '.nanobot', 'workspace'),
+  workspace: process.env.hiperone_WORKSPACE || path.join(require('os').homedir(), '.hiperone', 'workspace'),
   adminUsers: [],
   allowedModels: [
     'kimi-coding/k2p5',
@@ -79,7 +79,7 @@ Usage:
 
 Options:
   --admin <id>        Add administrator user ID (can be used multiple times)
-  --workspace <path>  Set workspace path (default: ~/.nanobot/workspace)
+  --workspace <path>  Set workspace path (default: ~/.hiperone/workspace)
   --models <list>     Comma-separated list of allowed models
   --interactive       Run in interactive mode
   --update            Update existing installation (backup first)
@@ -396,7 +396,7 @@ function logBlockedCommand(command, userId, context) {
   // Write to audit log
   const fs = require('fs');
   const path = require('path');
-  const logDir = path.join(process.env.nanobot_WORKSPACE || '', 'logs', 'security');
+  const logDir = path.join(process.env.hiperone_WORKSPACE || '', 'logs', 'security');
   const logFile = path.join(logDir, 'blocked-commands.log');
   
   fs.appendFileSync(logFile, JSON.stringify(logEntry) + '\\n');
@@ -505,7 +505,7 @@ function generateAuditorJs() {
 const fs = require('fs');
 const path = require('path');
 
-const AUDIT_LOG_DIR = path.join(process.env.nanobot_WORKSPACE || '.', 'logs', 'security');
+const AUDIT_LOG_DIR = path.join(process.env.hiperone_WORKSPACE || '.', 'logs', 'security');
 
 // Ensure log directory exists
 if (!fs.existsSync(AUDIT_LOG_DIR)) {

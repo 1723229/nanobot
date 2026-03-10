@@ -29,7 +29,7 @@ def get_token(config):
     app_secret = config.get('FEISHU_APP_SECRET')
     
     if not app_id or not app_secret:
-        raise Exception("缺少飞书配置，请检查 ~/.nanobot/config/main.env")
+        raise Exception("缺少飞书配置，请检查 ~/.hiperone/config/main.env")
     
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     resp = requests.post(url, json={"app_id": app_id, "app_secret": app_secret})

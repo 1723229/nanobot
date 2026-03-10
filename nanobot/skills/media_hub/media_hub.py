@@ -70,7 +70,7 @@ class MediaHub:
     """
     
     def __init__(self):
-        self.workspace = Path('~/.nanobot/workspace')
+        self.workspace = Path('~/.hiperone/workspace')
         self.temp_dir = self.workspace / 'temp' / 'media_processing'
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         

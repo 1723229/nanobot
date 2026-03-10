@@ -200,7 +200,7 @@ cat logs/security/drill-$(date +%Y%m%d).json
 
 ### Q: 安装脚本提示权限不足
 ```bash
-chmod -R u+w ~/.nanobot/workspace
+chmod -R u+w ~/.hiperone/workspace
 ```
 
 ### Q: 加固后 /new 仍能执行

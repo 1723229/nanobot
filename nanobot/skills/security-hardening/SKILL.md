@@ -52,7 +52,7 @@ node skills/security-hardening/verify.js
   - 推荐：`kimi-coding/k2p5`, `google/gemini-2.0-flash`
 
 - [ ] **工作区路径**
-  - 通常是 `~/.nanobot/workspace`
+  - 通常是 `~/.hiperone/workspace`
 
 ### 四、执行加固
 
@@ -61,7 +61,7 @@ node skills/security-hardening/verify.js
 ```bash
 node skills/security-hardening/install.js \
   --admin=ou_xxxxxxxx \
-  --workspace=~/.nanobot/workspace \
+  --workspace=~/.hiperone/workspace \
   --models=kimi-coding/k2p5,google/gemini-2.0-flash
 ```
 
@@ -180,7 +180,7 @@ node skills/security-hardening/install.js --update
 ### Q1: 安装脚本报错 "权限不足"
 **解决：** 确保对工作区有写权限
 ```bash
-chmod -R u+w ~/.nanobot/workspace
+chmod -R u+w ~/.hiperone/workspace
 ```
 
 ### Q2: 加固后 /new 命令还能执行

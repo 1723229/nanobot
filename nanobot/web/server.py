@@ -154,7 +154,7 @@ def _make_provider(config: Config):
 
     p = config.get_provider()
     if not (p and p.api_key) and not model.startswith("bedrock/"):
-        raise RuntimeError("No API key configured. Set one in ~/.nanobot/config.json")
+        raise RuntimeError("No API key configured. Set one in ~/.hiperone/config.json")
     return LiteLLMProvider(
         api_key=p.api_key if p else None,
         api_base=config.get_api_base(),

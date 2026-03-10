@@ -387,7 +387,7 @@ class ContentExtractor:
         try:
             # 复用现有的wechat-article-fetcher
             import sys
-            sys.path.insert(0, '/Users/delta/.nanobot/workspace/skills/wechat-article-fetcher')
+            sys.path.insert(0, '/Users/delta/.hiperone/workspace/skills/wechat-article-fetcher')
             from wechat_fetcher import WechatArticleFetcher
             
             fetcher = WechatArticleFetcher()

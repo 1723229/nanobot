@@ -32,8 +32,8 @@ function check(message, passed) {
 const args = process.argv.slice(2);
 const quiet = args.includes('--quiet');
 
-const workspace = process.env.nanobot_WORKSPACE ||
-  path.join(require('os').homedir(), '.nanobot', 'workspace');
+const workspace = process.env.hiperone_WORKSPACE ||
+  path.join(require('os').homedir(), '.hiperone', 'workspace');
 
 const securityDir = path.join(workspace, 'security');
 const soulPath = path.join(workspace, 'SOUL.md');

@@ -9,7 +9,7 @@ import os
 import sys
 
 # 添加workspace到路径
-sys.path.insert(0, '~/.nanobot/workspace')
+sys.path.insert(0, '~/.hiperone/workspace')
 
 from skills.document_hub.document_hub import (
     read, write, convert, get_info,

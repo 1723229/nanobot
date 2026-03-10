@@ -101,7 +101,7 @@ fields = get_fields("tblH6xn2dp6E1UtD")
 ### 命令行
 
 ```bash
-cd /root/.nanobot/workspace/skills/feishu-bitable
+cd /root/.hiperone/workspace/skills/feishu-bitable
 
 # ============ 日报操作 ============
 
@@ -243,7 +243,7 @@ export NANOBOT_CHANNELS__FEISHU__APP_SECRET=xxx
 ## 文件结构
 
 ```
-/root/.nanobot/workspace/skills/feishu-bitable/
+/root/.hiperone/workspace/skills/feishu-bitable/
 ├── SKILL.md              # 技能文档
 ├── __init__.py           # Python API 模块
 └── scripts/

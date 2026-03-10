@@ -2,7 +2,7 @@
 """
 Secure Key Manager - 安全密钥管理系统
 ======================================
-1. 密钥存储在加密文件 (~/.nanobot/.secrets.enc)
+1. 密钥存储在加密文件 (~/.hiperone/.secrets.enc)
 2. TOOLS.md 只存占位符，不存真实密钥
 3. 运行时动态解密获取
 4. 输出时自动脱敏
@@ -23,8 +23,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # 加密文件路径
-SECRETS_FILE = Path.home() / '.nanobot' / '.secrets.enc'
-SALT_FILE = Path.home() / '.nanobot' / '.salt'
+SECRETS_FILE = Path.home() / '.hiperone' / '.secrets.enc'
+SALT_FILE = Path.home() / '.hiperone' / '.salt'
 
 class SecureKeyManager:
     """安全密钥管理器"""
@@ -198,7 +198,7 @@ def sanitize_output(text: str) -> str:
         # Hex keys (32+ chars)
         (r'\b[0-9a-fA-F]{32,}\b', '[HEX-REDACTED]'),
         # File paths
-        (r'/Users/[a-zA-Z]+/\.nanobot/[^\s]*', '[LOCAL-PATH]'),
+        (r'/Users/[a-zA-Z]+/\.hiperone/[^\s]*', '[LOCAL-PATH]'),
     ]
     
     result = text

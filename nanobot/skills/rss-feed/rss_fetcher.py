@@ -61,7 +61,7 @@ RSS_SOURCES = {
 }
 
 # 数据存储路径
-DATA_DIR = Path("~/.nanobot/workspace/01-Projects/daily-report/01-raw-materials/rss-data")
+DATA_DIR = Path("~/.hiperone/workspace/01-Projects/daily-report/01-raw-materials/rss-data")
 DATA_DIR.mkdir(exist_ok=True)
 
 class RSSFetcher:

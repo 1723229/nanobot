@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 飞书配置检查工具
-验证 config/feishu.json + ~/.nanobot/.env 配置是否正确
+验证 config/feishu.json + ~/.hiperone/.env 配置是否正确
 """
 
 import sys
@@ -111,7 +111,7 @@ def check_config():
         print()
         print("1. 访问飞书开放平台：https://open.feishu.cn/")
         print("2. 创建自建应用，获取 APP_ID 和 APP_SECRET")
-        print("3. 编辑配置文件：~/.nanobot/.env")
+        print("3. 编辑配置文件：~/.hiperone/.env")
         print("4. 重新运行检查：python skills/feishu-doc-orchestrator/feishu-doc-orchestrator/scripts/check_config.py")
         return 1
 

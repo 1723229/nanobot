@@ -19,7 +19,7 @@ class ShoppingAssistant:
     """智能购物助手"""
     
     def __init__(self):
-        self.cookie_dir = os.path.expanduser("~/.nanobot/.cookies")
+        self.cookie_dir = os.path.expanduser("~/.hiperone/.cookies")
         os.makedirs(self.cookie_dir, exist_ok=True)
         
     def save_cookie(self, platform: str, cookie_data: dict):

@@ -88,7 +88,7 @@ def sanitize_path(path: str) -> str:
     if path.startswith(home):
         path = path.replace(home, "~")
     # 移除workspace绝对路径
-    workspace = "~/.nanobot/workspace"
+    workspace = "~/.hiperone/workspace"
     if path.startswith(workspace):
         path = path.replace(workspace, "workspace")
     return path

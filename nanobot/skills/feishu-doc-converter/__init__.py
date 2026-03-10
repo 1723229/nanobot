@@ -24,7 +24,7 @@ def load_config():
     """加载飞书配置（非敏感配置从 JSON/env 文件读取，凭据从系统环境变量读取）"""
     json_config_paths = [
         Path(__file__).parent.parent.parent / "config" / "feishu.json",
-        Path.home() / '.nanobot' / 'workspace' / 'config' / 'feishu.json',
+        Path.home() / '.hiperone' / 'workspace' / 'config' / 'feishu.json',
     ]
     
     for json_path in json_config_paths:

@@ -6,7 +6,7 @@ Content Extractor 示例脚本
 """
 
 import sys
-sys.path.insert(0, '/Users/delta/.nanobot/workspace')
+sys.path.insert(0, '/Users/delta/.hiperone/workspace')
 
 from skills.content_extractor.content_extractor import (
     extract, batch_extract, detect_platform, Platform

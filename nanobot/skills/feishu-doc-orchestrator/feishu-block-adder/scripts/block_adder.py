@@ -19,7 +19,7 @@ def load_config():
     """加载飞书配置（凭据从系统环境变量读取）"""
     import os
     possible_paths = [
-        Path.home() / '.nanobot' / '.env',
+        Path.home() / '.hiperone' / '.env',
         Path(__file__).parent.parent.parent.parent / "feishu-config.env",
         Path(".claude/feishu-config.env"),
         Path("../feishu-config.env"),

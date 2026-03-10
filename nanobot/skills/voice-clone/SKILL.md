@@ -168,7 +168,7 @@ def download_audio(audio_url, output_path):
 
 ```python
 # 配置
-AUDIO_SAMPLE = "~/.nanobot/workspace/01-Projects/career-coaching/03-completed/短视频学习/吴娜短视频样例.mp3"
+AUDIO_SAMPLE = "~/.hiperone/workspace/01-Projects/career-coaching/03-completed/短视频学习/吴娜短视频样例.mp3"
 VOICE_ID = "wuna-001"
 KOUBO_TEXT = """我是外企面试官。2026年求职，你一定要学会用人工智能！
 不懂人工智能的简历直接被淘汰，会用的轻松拿下高薪offer！"""

@@ -4,7 +4,7 @@
 早晚报飞书文档生成器
 使用 feishu-doc-orchestrator 技能将MD转换为完整格式的飞书文档
 
-配置文件: ~/.nanobot/.env (统一配置)
+配置文件: ~/.hiperone/.env (统一配置)
 
 用法:
     python create_feishu_doc.py <md_file> <title>
@@ -35,7 +35,7 @@ def load_config():
     """加载飞书配置（非敏感配置从 JSON/env 文件读取，凭据从系统环境变量读取）"""
     json_config_paths = [
         Path(__file__).parent.parent.parent.parent / "config" / "feishu.json",
-        Path.home() / '.nanobot' / 'workspace' / 'config' / 'feishu.json',
+        Path.home() / '.hiperone' / 'workspace' / 'config' / 'feishu.json',
     ]
     
     for json_path in json_config_paths:
@@ -69,7 +69,7 @@ def load_config():
     # 回退：从 .env 读取非敏感配置
     config = {}
     config_paths = [
-        Path.home() / '.nanobot' / '.env',
+        Path.home() / '.hiperone' / '.env',
         Path.home() / '.claude' / 'feishu-config.env',
     ]
     for p in config_paths:

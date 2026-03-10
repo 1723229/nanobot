@@ -76,7 +76,7 @@ python3 key_manager.py sanitize -t "文本中包含 sk-xxx 等密钥"
 
 ```python
 import sys
-sys.path.insert(0, '~/.nanobot/workspace/skills/secure-key-manager')
+sys.path.insert(0, '~/.hiperone/workspace/skills/secure-key-manager')
 from key_manager import SecureKeyManager, sanitize_output
 
 # 初始化并解锁

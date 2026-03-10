@@ -208,7 +208,7 @@ class OpenVikingConfig(Base):
     server_url: str = ""
     user_id: str = ""
     api_key: str = ""
-    data_dir: str = "~/.nanobot/openviking"
+    data_dir: str = "~/.hiperone/openviking"
     vlm_api_key: str = ""
     vlm_base_url: str = ""
     vlm_model: str = ""
@@ -246,7 +246,7 @@ class ChannelsConfig(Base):
 class AgentDefaults(Base):
     """Default agent configuration."""
 
-    workspace: str = "~/.nanobot/workspace"
+    workspace: str = "~/.hiperone/workspace"
     model: str = "anthropic/claude-opus-4-5"
     provider: str = (
         "auto"  # Provider name (e.g. "anthropic", "openrouter") or "auto" for auto-detection
