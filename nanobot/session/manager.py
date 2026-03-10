@@ -63,6 +63,17 @@ class Session:
             out.append(entry)
         return out
 
+    def clone(self) -> "Session":
+        """Return a shallow copy with an independent messages list."""
+        return Session(
+            key=self.key,
+            messages=list(self.messages),
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            metadata=dict(self.metadata),
+            last_consolidated=self.last_consolidated,
+        )
+
     def clear(self) -> None:
         """Clear all messages and reset session to initial state."""
         self.messages = []

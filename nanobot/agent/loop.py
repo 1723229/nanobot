@@ -154,7 +154,7 @@ class AgentLoop:
             logger.exception("Failed to register OpenViking hooks")
 
     async def _ensure_viking_client(self) -> None:
-        """Lazily create VikingClient and attach to ContextBuilder."""
+        """Lazily create VikingClient and inject into ContextBuilder, tools, and hooks."""
         if self._viking_client_initialized:
             return
         self._viking_client_initialized = True
@@ -166,7 +166,20 @@ class AgentLoop:
                 return
             from nanobot.openviking.client import VikingClient
             client = await VikingClient.from_config()
+
+            max_commits = getattr(self.openviking_config, "max_concurrent_commits", 1)
+            client.set_max_concurrent_commits(max_commits)
+
             self.context.set_viking_client(client)
+
+            from nanobot.agent.tools.openviking import _OVTool
+            _OVTool._shared_client = client
+
+            for hooks in self.hook_manager._hooks.values():
+                for hook in hooks:
+                    if hasattr(hook, "set_client"):
+                        hook.set_client(client)
+
             logger.info("OpenViking client initialised (mode={})", self.openviking_config.mode)
         except Exception:
             logger.exception("Failed to initialise OpenViking client — continuing without it")
@@ -489,13 +502,19 @@ class AgentLoop:
 
         unconsolidated = len(session.messages) - session.last_consolidated
         if (unconsolidated >= self.memory_window and session.key not in self._consolidating):
+            session_clone = session.clone()
+            keep_count = min(10, max(2, self.memory_window // 2))
+            session.messages = session.messages[-keep_count:] if keep_count else []
+            session.last_consolidated = 0
+            self.sessions.save(session)
+
             self._consolidating.add(session.key)
             lock = self._consolidation_locks.setdefault(session.key, asyncio.Lock())
 
             async def _consolidate_and_unlock():
                 try:
                     async with lock:
-                        await self._consolidate_memory(session)
+                        await self._consolidate_memory(session_clone, archive_all=True)
                 finally:
                     self._consolidating.discard(session.key)
                     _task = asyncio.current_task()

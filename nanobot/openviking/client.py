@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import re
 import uuid
 from pathlib import Path
@@ -73,6 +75,12 @@ class VikingClient:
             self.agent_space_name = hashlib.md5(
                 (self.user_id + (agent_id or "")).encode()
             ).hexdigest()[:12]
+
+        self._commit_semaphore = asyncio.Semaphore(1)
+
+    def set_max_concurrent_commits(self, n: int) -> None:
+        """Update the concurrency limit for commit operations."""
+        self._commit_semaphore = asyncio.Semaphore(max(1, n))
 
     @staticmethod
     def _ensure_ov_config(
@@ -197,6 +205,52 @@ class VikingClient:
         )
 
     # ------------------------------------------------------------------
+    # User management (remote mode)
+    # ------------------------------------------------------------------
+
+    async def _check_user_exists(self, user_id: str) -> bool:
+        """Check whether a user exists. Always True for local mode."""
+        if self.mode == "local":
+            return True
+        try:
+            from nanobot.config.loader import load_config
+            cfg = load_config().openviking
+            account_id = getattr(cfg, "account_id", "") or "default"
+            res = await self.client.admin_list_users(account_id)
+            if not res:
+                return False
+            return any(u.get("user_id") == user_id for u in res)
+        except Exception as e:
+            logger.warning("Failed to check user existence: {}", e)
+            return False
+
+    async def _initialize_user(self, user_id: str, role: str = "user") -> bool:
+        """Register a user in the remote account. No-op for local mode."""
+        if self.mode == "local":
+            return True
+        try:
+            from nanobot.config.loader import load_config
+            cfg = load_config().openviking
+            account_id = getattr(cfg, "account_id", "") or "default"
+            await self.client.admin_register_user(
+                account_id=account_id, user_id=user_id, role=role,
+            )
+            return True
+        except Exception as e:
+            if "User already exists" in str(e):
+                return True
+            logger.warning("Failed to initialize user {}: {}", user_id, e)
+            return False
+
+    async def _ensure_user(self, user_id: str) -> bool:
+        """Check and auto-initialize a user if needed. Returns success."""
+        if self.mode == "local" or not user_id:
+            return True
+        if await self._check_user_exists(user_id):
+            return True
+        return await self._initialize_user(user_id)
+
+    # ------------------------------------------------------------------
     # Search & find
     # ------------------------------------------------------------------
 
@@ -218,12 +272,17 @@ class VikingClient:
 
     async def search_user_memory(self, query: str, sender_id: str = "") -> list[dict[str, Any]]:
         uid = sender_id or self.user_id
+        if not await self._ensure_user(uid):
+            return []
         uri = f"viking://user/{uid}/memories/"
         result = await self.client.search(query, target_uri=uri)
         return [self._matched_to_dict(m) for m in getattr(result, "memories", [])]
 
     async def search_memory(self, query: str, limit: int = 10) -> dict[str, list[Any]]:
         """Search both user and agent memories."""
+        if not await self._ensure_user(self.user_id):
+            return {"user_memory": [], "agent_memory": []}
+
         uri_user = f"viking://user/{self.user_id}/memories/"
         user_result = await self.client.find(query=query, target_uri=uri_user, limit=limit)
 
@@ -283,14 +342,26 @@ class VikingClient:
     ) -> dict[str, Any]:
         """Commit conversation messages to OpenViking.
 
-        Args:
-            session_id: Session identifier.
-            messages: List of message dicts with role/content.
-            sender_id: Optional user identifier for per-user memory isolation.
+        The semaphore limits concurrent commits to avoid memory spikes.
+        ``session.commit()`` is offloaded to a thread because it performs
+        synchronous LLM calls, embedding computation, and file I/O that
+        would otherwise block the event loop for 5-30 seconds.
         """
-        session = self.client.session(session_id)
+        async with self._commit_semaphore:
+            uid = sender_id or self.user_id
+            if not await self._ensure_user(uid):
+                return {"success": False, "error": "Failed to initialize user"}
 
-        if self.mode == "local":
+            actual_sid = session_id
+            if hasattr(self.client, "create_session"):
+                try:
+                    res = await self.client.create_session()
+                    actual_sid = res["session_id"]
+                except Exception:
+                    logger.debug("create_session unavailable, falling back to provided session_id")
+
+            session = self.client.session(actual_sid)
+
             for message in messages:
                 role = message.get("role")
                 content = message.get("content")
@@ -307,7 +378,6 @@ class VikingClient:
 
                     tool_id = f"{tool_name}_{uuid.uuid4().hex[:8]}"
                     try:
-                        import json
                         args_str = tool_info.get("args", "{}")
                         tool_input = json.loads(args_str) if args_str else {}
                     except Exception:
@@ -325,7 +395,7 @@ class VikingClient:
                         ToolPart(
                             tool_id=tool_id,
                             tool_name=tool_name,
-                            tool_uri=f"viking://session/{session_id}/tools/{tool_id}",
+                            tool_uri=f"viking://session/{actual_sid}/tools/{tool_id}",
                             tool_input=tool_input,
                             tool_output=result_str[:2000],
                             tool_status="completed" if execute_success else "error",
@@ -337,21 +407,13 @@ class VikingClient:
                     )
 
                 if not parts:
-                    parts = [TextPart(text=self._normalize_content(content) if content else "")]
+                    continue
                 session.add_message(role=role, parts=parts)
 
-            result = session.commit()
-        else:
-            for message in messages:
-                raw = message.get("content")
-                await session.add_message(
-                    role=message.get("role"),
-                    content=self._normalize_content(raw) if raw else "",
-                )
-            result = await session.commit()
-
-        logger.debug("Committed {} messages to OpenViking session {}", len(messages), session_id)
-        return {"success": result.get("status", False)}
+            result = await asyncio.to_thread(session.commit)
+            logger.debug("Committed {} messages to OpenViking session {}", len(messages), actual_sid)
+            status = result.get("status", False)
+            return {"success": status is True or status == "committed"}
 
     # ------------------------------------------------------------------
     # Memory context helpers
@@ -373,6 +435,8 @@ class VikingClient:
         )
 
     async def get_viking_user_profile(self) -> str:
+        if not await self._ensure_user(self.user_id):
+            return ""
         content = await self.read_content(
             uri=f"viking://user/{self.user_id}/memories/profile.md", level="read"
         )
@@ -408,7 +472,16 @@ class VikingClient:
         return str(content)
 
     @staticmethod
-    def _matched_to_dict(ctx: Any) -> dict[str, Any]:
+    def _relation_to_dict(rel: Any) -> dict[str, Any]:
+        return {
+            "from_uri": getattr(rel, "from_uri", ""),
+            "to_uri": getattr(rel, "to_uri", ""),
+            "relation_type": getattr(rel, "relation_type", ""),
+            "reason": getattr(rel, "reason", ""),
+        }
+
+    @classmethod
+    def _matched_to_dict(cls, ctx: Any) -> dict[str, Any]:
         return {
             "uri": getattr(ctx, "uri", ""),
             "context_type": str(getattr(ctx, "context_type", "")),
@@ -418,6 +491,9 @@ class VikingClient:
             "category": getattr(ctx, "category", ""),
             "score": getattr(ctx, "score", 0.0),
             "match_reason": getattr(ctx, "match_reason", ""),
+            "relations": [
+                cls._relation_to_dict(r) for r in getattr(ctx, "relations", [])
+            ],
         }
 
     @staticmethod
@@ -432,5 +508,12 @@ class VikingClient:
             lines.append(f"{idx}. {abstract}; uri: {uri}; score: {score:.2f}")
         return "\n".join(lines)
 
+    async def aclose(self) -> None:
+        if hasattr(self.client, "close"):
+            result = self.client.close()
+            if hasattr(result, "__await__"):
+                await result
+
     def close(self) -> None:
-        self.client.close()
+        if hasattr(self.client, "close"):
+            self.client.close()

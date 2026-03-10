@@ -57,14 +57,6 @@ class ContextBuilder:
         if memory:
             parts.append(f"# Memory\n\n{memory}")
 
-        # OpenViking semantic memory context
-        if self._viking_client and current_message:
-            viking_mem = await self.memory.get_viking_memory_context(
-                current_message, self._viking_client
-            )
-            if viking_mem:
-                parts.append(f"# Semantic Memory\n\n{viking_mem}")
-
         always_skills = self.skills.get_always_skills()
         if always_skills:
             always_content = self.skills.load_skills_for_context(always_skills)
@@ -189,11 +181,24 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             skill_names, current_message=current_message,
         )
 
-        return [
+        messages = [
             {"role": "system", "content": system_prompt},
             *history,
             {"role": "user", "content": merged},
         ]
+
+        if self._viking_client and current_message:
+            viking_mem = await self.memory.get_viking_memory_context(
+                current_message, self._viking_client
+            )
+            if viking_mem:
+                messages.append({
+                    "role": "system",
+                    "content": f"## Your memories about the current conversation. "
+                    f"If you need more details, use the tools.\n{viking_mem}",
+                })
+
+        return messages
 
     def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
         """Build user message content with optional base64-encoded images."""

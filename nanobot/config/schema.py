@@ -216,6 +216,7 @@ class OpenVikingConfig(Base):
     embedding_api_key: str = ""
     embedding_base_url: str = ""
     embedding_dimension: int = 1024
+    max_concurrent_commits: int = 1
 
 
 class WebConfig(BaseModel):

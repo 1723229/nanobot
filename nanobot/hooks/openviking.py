@@ -26,6 +26,9 @@ class OpenVikingCompactHook(Hook):
     def __init__(self) -> None:
         self._client: VikingClient | None = None
 
+    def set_client(self, client: VikingClient) -> None:
+        self._client = client
+
     async def _get_client(self) -> VikingClient:
         if self._client is None:
             self._client = await VikingClient.from_config()
@@ -58,6 +61,9 @@ class OpenVikingPostCallHook(Hook):
 
     def __init__(self) -> None:
         self._client: VikingClient | None = None
+
+    def set_client(self, client: VikingClient) -> None:
+        self._client = client
 
     async def _get_client(self) -> VikingClient:
         if self._client is None:
