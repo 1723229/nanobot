@@ -337,16 +337,38 @@ class VikingClient:
     # Session commit
     # ------------------------------------------------------------------
 
+    _COMMIT_BATCH_SIZE = 100
+
     async def commit(
         self, session_id: str, messages: list[dict[str, Any]], sender_id: str = "",
     ) -> dict[str, Any]:
         """Commit conversation messages to OpenViking.
 
-        The semaphore limits concurrent commits to avoid memory spikes.
-        ``session.commit()`` is offloaded to a thread because it performs
-        synchronous LLM calls, embedding computation, and file I/O that
-        would otherwise block the event loop for 5-30 seconds.
+        Large message lists are automatically split into batches to avoid
+        exceeding the LLM token limit during memory extraction.  The
+        semaphore limits concurrent commits to control memory usage, and
+        ``session.commit()`` is offloaded to a thread to avoid blocking
+        the event loop.
         """
+        if len(messages) > self._COMMIT_BATCH_SIZE:
+            logger.info(
+                "Splitting {} messages into batches of {}",
+                len(messages), self._COMMIT_BATCH_SIZE,
+            )
+            all_ok = True
+            for i in range(0, len(messages), self._COMMIT_BATCH_SIZE):
+                batch = messages[i : i + self._COMMIT_BATCH_SIZE]
+                result = await self._commit_batch(session_id, batch, sender_id)
+                if not result.get("success"):
+                    all_ok = False
+            return {"success": all_ok}
+
+        return await self._commit_batch(session_id, messages, sender_id)
+
+    async def _commit_batch(
+        self, session_id: str, messages: list[dict[str, Any]], sender_id: str = "",
+    ) -> dict[str, Any]:
+        """Commit a single batch of messages (at most ``_COMMIT_BATCH_SIZE``)."""
         async with self._commit_semaphore:
             uid = sender_id or self.user_id
             if not await self._ensure_user(uid):
