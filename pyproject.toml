@@ -119,3 +119,6 @@ testpaths = ["tests"]
 markers = [
     "e2e: end-to-end tests requiring real LLM provider (use --e2e to run)",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
