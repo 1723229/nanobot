@@ -15,8 +15,8 @@ export NANOBOT_CHANNELS__FEISHU__APP_SECRET=xxx
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `approval_code` | string | 审批模板码 | `E565EC28-xxx` |
-| `user_id` | string | 申请人用户 ID | `8cff42c9` |
+| `approval_code` | string | 审批模板码（固定值） | `E565EC28-57C7-461C-B7ED-1E2D838F4878` |
+| `user_id` | string | 申请人的 open_id | `ou_xxxxxxxxxxxx` |
 | `leave_type` | string | 假期类型名称或 leave_id | `年假` 或 `7138673249737506817` |
 | `start_time` | string | 开始时间 (RFC3339) | `2026-03-11T09:00:00+08:00` |
 | `end_time` | string | 结束时间 (RFC3339) | `2026-03-11T18:00:00+08:00` |
@@ -26,7 +26,6 @@ export NANOBOT_CHANNELS__FEISHU__APP_SECRET=xxx
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `user_id_type` | string | `user_id` | 用户 ID 类型：`user_id`, `open_id`, `union_id` |
 | `unit` | string | `DAY` | 时长单位：`DAY`, `HOUR`, `HALF_DAY` |
 | `interval` | string | `1` | 时长计算方式 |
 
@@ -72,7 +71,7 @@ payload["form"] = json.dumps(form_array, ensure_ascii=False)
 | 错误码 | 消息 | 解决方案 |
 |--------|------|----------|
 | 9499 | Invalid parameter type in json: form | form 必须是 JSON 字符串数组 |
-| 1390001 | user id not found | 检查 user_id_type 和 user_id 是否正确 |
+| 1390001 | user id not found | 检查 open_id 是否正确 |
 | 1390001 | start time format is not RFC3339 | 时间格式改为 RFC3339 |
 | 1390001 | leave is conflict | 请假时间冲突，调整时间 |
 | 99991666 | 权限不足 | 检查应用权限配置 |

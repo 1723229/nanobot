@@ -16,6 +16,7 @@ import argparse
 from typing import Dict, Any, Optional
 
 BASE_URL = "https://open.feishu.cn/open-apis"
+DEFAULT_APPROVAL_CODE = "E565EC28-57C7-461C-B7ED-1E2D838F4878"
 
 LEAVE_TYPES = {
     "年假": "7138673249737506817",
@@ -59,7 +60,6 @@ def create_leave_approval(
     start_time: str,
     end_time: str,
     reason: str,
-    user_id_type: str = "user_id",
     unit: str = "DAY",
     interval: str = "1",
 ) -> Dict[str, Any]:
@@ -68,12 +68,11 @@ def create_leave_approval(
 
     Args:
         approval_code: 审批模板码
-        user_id: 申请人用户 ID
+        user_id: 申请人的 open_id
         leave_type: 假期类型名称（如"年假"）或 leave_id
         start_time: 开始时间 (RFC3339)
         end_time: 结束时间 (RFC3339)
         reason: 请假事由
-        user_id_type: 用户 ID 类型 (user_id / open_id / union_id)
         unit: 时长单位 (DAY / HOUR / HALF_DAY)
         interval: 时长计算方式
 
@@ -102,8 +101,7 @@ def create_leave_approval(
 
     payload = {
         "approval_code": approval_code,
-        "user_id_type": user_id_type,
-        "user_id": user_id,
+        "open_id": user_id,
         "form": json.dumps(form_array, ensure_ascii=False),
     }
 
@@ -146,8 +144,7 @@ def main():
 
 示例:
   python feishu_approval_leave.py \\
-    --approval-code E565EC28-57C7-461C-B7ED-1E2D838F4878 \\
-    --user-id 8cff42c9 \\
+    --user-id ou_xxxxxxxxxxxx \\
     --leave-type 年假 \\
     --start-time "2026-03-11T09:00:00+08:00" \\
     --end-time "2026-03-11T18:00:00+08:00" \\
@@ -155,14 +152,8 @@ def main():
         """,
     )
 
-    parser.add_argument("--approval-code", required=True, help="审批模板码")
-    parser.add_argument("--user-id", required=True, help="用户 ID")
-    parser.add_argument(
-        "--user-id-type",
-        default="user_id",
-        choices=["user_id", "open_id", "union_id"],
-        help="用户 ID 类型 (默认：user_id)",
-    )
+    parser.add_argument("--approval-code", default=DEFAULT_APPROVAL_CODE, help=f"审批模板码 (默认：{DEFAULT_APPROVAL_CODE})")
+    parser.add_argument("--user-id", required=True, help="申请人的 open_id")
     parser.add_argument(
         "--leave-type", required=True, help="假期类型 (如：年假、事假、病假)"
     )
@@ -189,7 +180,7 @@ def main():
         print("飞书请假审批创建")
         print("=" * 70)
         print(f"  审批模板：{args.approval_code}")
-        print(f"  用户 ID: {args.user_id} ({args.user_id_type})")
+        print(f"  open_id: {args.user_id}")
         print(f"  假期类型：{args.leave_type}")
         print(f"  时间：{args.start_time} - {args.end_time}")
         print(f"  事由：{args.reason}")
@@ -202,7 +193,6 @@ def main():
         start_time=args.start_time,
         end_time=args.end_time,
         reason=args.reason,
-        user_id_type=args.user_id_type,
         unit=args.unit,
         interval=args.interval,
     )

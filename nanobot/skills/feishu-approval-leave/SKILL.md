@@ -16,12 +16,20 @@ export NANOBOT_CHANNELS__FEISHU__APP_ID=cli_xxx
 export NANOBOT_CHANNELS__FEISHU__APP_SECRET=xxx
 ```
 
+## 审批模板编码
+
+请假审批使用固定的模板编码，**无需向用户询问**：
+
+```
+approval_code = "E565EC28-57C7-461C-B7ED-1E2D838F4878"
+```
+
+此编码对应组织内的「请假」审批流程，所有请假类型（年假、事假、病假等）共用同一个模板。
+
 ## 前置条件
 
 - 环境变量已配置飞书 App ID / App Secret
-- 应用拥有 `approval:instance:write` 权限，且已发布到目标组织
-- 已知申请人的 user_id（或 open_id / union_id）
-- 已知请假审批模板码（approval_code），模板状态为 ACTIVE
+- 已知申请人的 open_id（飞书用户唯一标识，格式如 `ou_xxxxxxxxxxxx`）
 
 ## 使用方式
 
@@ -32,14 +40,16 @@ export NANOBOT_CHANNELS__FEISHU__APP_SECRET=xxx
 ```python
 from feishu_approval_leave import create_leave_approval
 
+APPROVAL_CODE = "E565EC28-57C7-461C-B7ED-1E2D838F4878"  # 固定值，无需修改
+
 result = create_leave_approval(
-    approval_code="E565EC28-57C7-461C-B7ED-1E2D838F4878",
-    user_id="8cff42c9",
-    leave_type="年假",        # 支持中文名称或 leave_id
+    approval_code=APPROVAL_CODE,
+    user_id="ou_xxxxxxxxxxxx",  # 申请人的 open_id
+    leave_type="年假",            # 支持中文名称或 leave_id
     start_time="2026-03-11T09:00:00+08:00",  # RFC3339 格式
     end_time="2026-03-11T18:00:00+08:00",
     reason="请假事由",
-    unit="DAY"               # DAY / HOUR / HALF_DAY
+    unit="DAY"                   # DAY / HOUR / HALF_DAY
 )
 ```
 
@@ -47,8 +57,7 @@ result = create_leave_approval(
 
 ```bash
 python scripts/feishu_approval_leave.py \
-  --approval-code E565EC28-57C7-461C-B7ED-1E2D838F4878 \
-  --user-id 8cff42c9 \
+  --user-id ou_xxxxxxxxxxxx \
   --leave-type 年假 \
   --start-time "2026-03-11T09:00:00+08:00" \
   --end-time "2026-03-11T18:00:00+08:00" \
