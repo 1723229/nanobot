@@ -33,6 +33,7 @@ from nanobot.hooks.manager import HookManager
 from nanobot.hooks.self_improvement import (
     SelfImprovementHook,
     _ERROR_PATTERNS,
+    _EXIT_CODE_RE,
     _REMINDER,
     register_self_improvement_hooks,
 )
@@ -85,50 +86,54 @@ class TestErrorPatternDetection:
     @pytest.mark.parametrize(
         "output",
         [
-            "error: something went wrong",
-            "Error: connection refused",
-            "ERROR: build failed",
-            "Unhandled exception in handler",
-            "Traceback (most recent call last):",
-            "command failed with status 1",
-            "FAILED to compile module",
-            "errno 13: Permission denied",
-            "permission denied: /etc/shadow",
-            "file not found: missing.txt",
+            "Traceback (most recent call last):\n  File 'x.py'\nValueError: bad",
             "bash: foobar: command not found",
             "ls: cannot access: No such file or directory",
             "Segmentation fault (core dumped)",
             "panic: runtime error: index out of range",
-            "fatal: not a git repository",
             "npm ERR! code ERESOLVE",
             "SyntaxError: unexpected token",
             "TypeError: undefined is not a function",
             "ModuleNotFoundError: No module named 'xyz'",
-            "Process exited with exit code 1",
-            "Command returned non-zero status",
+            "ImportError: cannot import name 'foo'",
+            "NameError: name 'x' is not defined",
+            "FileNotFoundError: [Errno 2] No such file",
+            "PermissionError: [Errno 13] Permission denied",
+            "OSError: [Errno 28] No space left on device",
+            "RuntimeError: something failed",
+            "ValueError: invalid literal",
+            "KeyError: 'missing_key'",
+            "AttributeError: object has no attribute 'x'",
+            "IndentationError: unexpected indent",
+            "FATAL: could not start server",
+            "errno 13: permission denied",
+            "some output\nExit code: 1",
+            "some output\nExit code: 127",
         ],
         ids=[
-            "error_colon",
-            "Error_colon",
-            "ERROR_colon",
-            "exception",
             "traceback",
-            "failed",
-            "FAILED",
-            "errno",
-            "permission_denied",
-            "not_found",
             "command_not_found",
             "no_such_file",
             "segfault",
             "panic",
-            "fatal",
             "npm_err",
             "syntax_error",
             "type_error",
             "module_not_found_error",
-            "exit_code",
-            "non_zero",
+            "import_error",
+            "name_error",
+            "file_not_found_error",
+            "permission_error",
+            "os_error",
+            "runtime_error",
+            "value_error",
+            "key_error",
+            "attribute_error",
+            "indentation_error",
+            "fatal",
+            "errno",
+            "exit_code_1",
+            "exit_code_127",
         ],
     )
     async def test_detects_error_pattern(
@@ -148,6 +153,11 @@ class TestErrorPatternDetection:
             "Process completed normally",
             "Listing directory contents...",
             "",
+            "❌ 创建失败\n   错误：1390001: leave balance not enough",
+            "Error: connection refused",
+            "FAILED to compile module",
+            "file not found: missing.txt",
+            "Process exited with exit code 1",
         ],
         ids=[
             "hello",
@@ -158,6 +168,11 @@ class TestErrorPatternDetection:
             "completed",
             "listing",
             "empty",
+            "app_level_error_zh",
+            "generic_error_colon",
+            "generic_failed",
+            "generic_not_found",
+            "exit_code_in_text",
         ],
     )
     async def test_does_not_flag_clean_output(
@@ -173,13 +188,13 @@ class TestHookToolFiltering:
     async def test_exec_tool_triggers(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        result = await hook.execute(ctx, tool_name="exec", result="fatal error")
+        result = await hook.execute(ctx, tool_name="exec", result="FATAL: crash")
         assert "[self-improvement]" in result["result"]
 
     async def test_shell_tool_triggers(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        result = await hook.execute(ctx, tool_name="shell", result="fatal error")
+        result = await hook.execute(ctx, tool_name="shell", result="FATAL: crash")
         assert "[self-improvement]" in result["result"]
 
     @pytest.mark.parametrize(
@@ -189,13 +204,13 @@ class TestHookToolFiltering:
     async def test_non_exec_tools_ignored(
         self, hook: SelfImprovementHook, ctx: HookContext, tool: str
     ) -> None:
-        result = await hook.execute(ctx, tool_name=tool, result="error: something broke")
+        result = await hook.execute(ctx, tool_name=tool, result="FATAL: something broke")
         assert "[self-improvement]" not in result["result"]
 
     async def test_empty_tool_name_ignored(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        result = await hook.execute(ctx, tool_name="", result="error: something broke")
+        result = await hook.execute(ctx, tool_name="", result="FATAL: something broke")
         assert "[self-improvement]" not in result["result"]
 
 
@@ -256,8 +271,8 @@ class TestHookEdgeCases:
     async def test_case_insensitive_matching(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        for variant in ["ERROR", "Error", "error", "eRrOr"]:
-            r = await hook.execute(ctx, tool_name="exec", result=f"{variant}: test")
+        for variant in ["SyntaxError:", "syntaxerror:", "SYNTAXERROR:", "COMMAND NOT FOUND", "command not found"]:
+            r = await hook.execute(ctx, tool_name="exec", result=f"{variant} test")
             assert "[self-improvement]" in r["result"], f"Case variant '{variant}' not detected"
 
     async def test_multiline_error_detected(
@@ -267,12 +282,12 @@ class TestHookEdgeCases:
         result = await hook.execute(ctx, tool_name="exec", result=output)
         assert "[self-improvement]" in result["result"]
 
-    async def test_error_pattern_in_path_triggers(
+    async def test_error_pattern_in_path_does_not_trigger(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        """A path containing 'error' will trigger — acceptable false positive."""
+        """A path containing 'error' no longer triggers with tightened patterns."""
         result = await hook.execute(ctx, tool_name="exec", result="/var/log/error.log exists")
-        assert "[self-improvement]" in result["result"]
+        assert "[self-improvement]" not in result["result"]
 
     async def test_very_long_output_with_error(
         self, hook: SelfImprovementHook, ctx: HookContext
@@ -293,6 +308,19 @@ class TestHookEdgeCases:
     ) -> None:
         exc = RuntimeError("something failed")
         result = await hook.execute(ctx, tool_name="exec", result=exc)
+        assert result["result"] is exc
+
+    async def test_exit_code_triggers(
+        self, hook: SelfImprovementHook, ctx: HookContext
+    ) -> None:
+        result = await hook.execute(ctx, tool_name="exec", result="some output\nExit code: 2")
+        assert "[self-improvement]" in result["result"]
+
+    async def test_exit_code_zero_does_not_trigger(
+        self, hook: SelfImprovementHook, ctx: HookContext
+    ) -> None:
+        """Exit code 0 is success, should not appear in ExecTool output but verify no match."""
+        result = await hook.execute(ctx, tool_name="exec", result="some output\nExit code: 0")
         assert "[self-improvement]" in result["result"]
 
 
@@ -673,7 +701,7 @@ class TestAgentLoopHookPipeline:
 
         ctx = HookContext(event_type="tool.post_call")
         hook_results = await mgr.fire(
-            "tool.post_call", ctx, tool_name="exec", result="fatal crash"
+            "tool.post_call", ctx, tool_name="exec", result="fatal: crash"
         )
 
         assert len(hook_results) == 2
@@ -709,7 +737,7 @@ class TestAgentLoopRegistration:
         loop = self._make_minimal_loop(tmp_path)
         ctx = HookContext(event_type="tool.post_call")
         results = await loop.hook_manager.fire(
-            "tool.post_call", ctx, tool_name="exec", result="error: bad"
+            "tool.post_call", ctx, tool_name="exec", result="TypeError: bad"
         )
         assert any("[self-improvement]" in r["result"] for r in results if isinstance(r, dict))
 

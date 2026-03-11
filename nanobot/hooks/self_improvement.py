@@ -10,11 +10,17 @@ from loguru import logger
 from nanobot.hooks.base import Hook, HookContext
 
 
+_EXIT_CODE_RE = re.compile(r"\nExit code: (\d+)\s*$")
+
 _ERROR_PATTERNS = re.compile(
-    r"error|exception|traceback|failed|errno|permission denied|not found"
-    r"|command not found|no such file|segfault|segmentation fault|panic|fatal"
-    r"|npm ERR!|SyntaxError|TypeError|ModuleNotFoundError"
-    r"|exit code|non-zero",
+    r"Traceback \(most recent call last\)"
+    r"|SyntaxError:|TypeError:|ModuleNotFoundError:|ImportError:|NameError:"
+    r"|FileNotFoundError:|PermissionError:|OSError:|RuntimeError:|ValueError:"
+    r"|KeyError:|AttributeError:|IndentationError:"
+    r"|command not found|No such file or directory"
+    r"|segfault|segmentation fault|panic:|FATAL:|core dumped"
+    r"|npm ERR!"
+    r"|errno \d+",
     re.IGNORECASE,
 )
 
@@ -45,8 +51,12 @@ class SelfImprovementHook(Hook):
         if not result_str:
             return {"tool_name": tool_name, "result": result}
 
-        if _ERROR_PATTERNS.search(result_str):
-            logger.debug("Self-improvement hook detected potential error in {} output", tool_name)
+        has_nonzero_exit = bool(_EXIT_CODE_RE.search(result_str))
+        has_error_pattern = bool(_ERROR_PATTERNS.search(result_str))
+
+        if has_nonzero_exit or has_error_pattern:
+            logger.debug("Self-improvement hook detected potential error in {} output (exit_code={}, pattern={})",
+                         tool_name, has_nonzero_exit, has_error_pattern)
             return {"tool_name": tool_name, "result": result_str + _REMINDER}
 
         return {"tool_name": tool_name, "result": result}
