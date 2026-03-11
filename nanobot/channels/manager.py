@@ -7,7 +7,6 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import Config
@@ -163,6 +162,27 @@ class ChannelManager:
                 cron_service=self.cron_service,
             )
             logger.info("Web channel enabled")
+        # WeCom channel
+        if self.config.channels.wecom.enabled:
+            try:
+                from nanobot.channels.wecom import WecomChannel
+                self.channels["wecom"] = WecomChannel(
+                    self.config.channels.wecom,
+                    self.bus,
+                )
+                logger.info("WeCom channel enabled")
+            except ImportError as e:
+                logger.warning("WeCom channel not available: {}", e)
+
+        self._validate_allow_from()
+
+    def _validate_allow_from(self) -> None:
+        for name, ch in self.channels.items():
+            if getattr(ch.config, "allow_from", None) == []:
+                raise SystemExit(
+                    f'Error: "{name}" has empty allowFrom (denies all). '
+                    f'Set ["*"] to allow everyone, or add specific user IDs.'
+                )
 
     async def _start_channel(self, name: str, channel: BaseChannel) -> None:
         """Start a channel and log any exceptions."""
