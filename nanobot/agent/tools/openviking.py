@@ -45,7 +45,7 @@ class OVReadTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Read content from OpenViking resources at different levels (abstract, overview, or full content)."
+        return "Read content from memory resources at different levels (abstract, overview, or full content)."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -70,7 +70,7 @@ class OVReadTool(_OVTool):
             client = await self._client()
             return await client.read_content(uri, level=level) or "(empty)"
         except Exception as e:
-            return f"Error reading from OpenViking: {e}"
+            return f"Error reading resource: {e}"
 
 
 class OVListTool(_OVTool):
@@ -80,7 +80,7 @@ class OVListTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "List resources in an OpenViking path."
+        return "List resources in a memory path."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -112,7 +112,7 @@ class OVListTool(_OVTool):
                 )
             return "\n".join(lines)
         except Exception as e:
-            return f"Error listing OpenViking resources: {e}"
+            return f"Error listing resources: {e}"
 
 
 class OVSearchTool(_OVTool):
@@ -122,7 +122,7 @@ class OVSearchTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Semantic search for resources in OpenViking."
+        return "Semantic search for resources in the memory system."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -146,7 +146,7 @@ class OVSearchTool(_OVTool):
                 return f"No results for: {query}"
             return str(results)
         except Exception as e:
-            return f"Error searching OpenViking: {e}"
+            return f"Error searching memory: {e}"
 
 
 class OVGrepTool(_OVTool):
@@ -156,7 +156,7 @@ class OVGrepTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Search OpenViking resources using regex patterns."
+        return "Search memory resources using regex patterns."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -213,7 +213,7 @@ class OVGlobTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Find OpenViking resources using glob patterns (e.g. **/*.md)."
+        return "Find memory resources using glob patterns (e.g. **/*.md)."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -262,7 +262,7 @@ class OVUserMemorySearchTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Search user memories in OpenViking for past conversations and preferences."
+        return "Search user memories for past conversations and preferences."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -302,7 +302,7 @@ class OVMemoryCommitTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Commit conversation messages to OpenViking for persistent memory."
+        return "Commit conversation messages for persistent memory."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -334,10 +334,10 @@ class OVMemoryCommitTool(_OVTool):
             client = await self._client()
             session_id = self._session_key_fn() if self._session_key_fn else "default"
             await client.commit(session_id, messages, sender_id=sender_id)
-            return f"Successfully committed {len(messages)} messages to OpenViking session."
+            return f"Successfully committed {len(messages)} messages to memory."
         except Exception as e:
-            logger.exception("Error committing to OpenViking")
-            return f"Error committing to OpenViking: {e}"
+            logger.exception("Error committing to memory")
+            return f"Error committing to memory: {e}"
 
 
 class OVAddResourceTool(_OVTool):
@@ -347,7 +347,7 @@ class OVAddResourceTool(_OVTool):
 
     @property
     def description(self) -> str:
-        return "Add a local file as a resource to OpenViking for semantic indexing."
+        return "Add a local file as a resource for semantic indexing."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -358,7 +358,7 @@ class OVAddResourceTool(_OVTool):
                 "description": {"type": "string", "description": "Description of the resource"},
                 "target_path": {
                     "type": "string",
-                    "description": "Optional target path in OpenViking to store the resource",
+                    "description": "Optional target path in the memory system to store the resource",
                 },
                 "wait": {
                     "type": "boolean",
@@ -385,7 +385,7 @@ class OVAddResourceTool(_OVTool):
                 return f"Successfully added resource: {root_uri}"
             return "Failed to add resource"
         except Exception as e:
-            return f"Error adding resource to OpenViking: {e}"
+            return f"Error adding resource: {e}"
 
 
 ALL_OV_TOOLS = [

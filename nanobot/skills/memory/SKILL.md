@@ -1,12 +1,12 @@
 ---
 name: memory
-description: Enhanced memory system with two layers - grep-based MEMORY.md/HISTORY.md (always available) plus optional OpenViking semantic search for structured conversation storage and advanced recall. When OpenViking is enabled, native tools (openviking_read, openviking_search, user_memory_search, openviking_memory_commit, etc.) are available directly. Use when users ask to remember information, search past conversations, recall previous discussions, or work with documents.
+description: Enhanced memory system with two layers - grep-based MEMORY.md/HISTORY.md (always available) plus optional semantic search for structured conversation storage and advanced recall. When semantic memory is enabled, native tools (openviking_read, openviking_search, user_memory_search, openviking_memory_commit, etc.) are available directly. Use when users ask to remember information, search past conversations, recall previous discussions, or work with documents.
 always: true
 ---
 
 # Memory System
 
-A dual-approach memory system combining simple markdown files with optional semantic search via OpenViking.
+A dual-approach memory system combining simple markdown files with optional semantic search.
 
 ## Core Layer (Always Available)
 
@@ -40,13 +40,13 @@ Write important facts immediately using `edit_file` or `write_file`:
 
 ### Auto-consolidation
 
-Old conversations are automatically summarized and appended to HISTORY.md when the session grows large. Long-term facts are extracted to MEMORY.md. You don't need to manage this. When OpenViking is enabled, conversations are also committed to OpenViking during consolidation for semantic indexing.
+Old conversations are automatically summarized and appended to HISTORY.md when the session grows large. Long-term facts are extracted to MEMORY.md. You don't need to manage this. When semantic memory is enabled, conversations are also committed to the memory system during consolidation for semantic indexing.
 
 ---
 
-## Enhanced Layer (OpenViking) — Native Integration
+## Enhanced Layer (Semantic Memory) — Native Integration
 
-When OpenViking is enabled in config, you have **native tools** registered directly — no CLI scripts needed:
+When semantic memory is enabled in config, you have **native tools** registered directly — no CLI scripts needed:
 
 ### Available Tools
 
@@ -61,14 +61,14 @@ When OpenViking is enabled in config, you have **native tools** registered direc
 | `openviking_memory_commit` | Commit messages for persistent memory |
 | `openviking_add_resource` | Ingest files for semantic indexing |
 
-### When to use OpenViking tools
+### When to use semantic memory tools
 
 - User explicitly requests semantic search or advanced recall
 - Conversation contains important technical details worth structured storage
 - User provides documents/files that need persistent context
 - User asks "what did we discuss about X?" where grep might miss semantic connections
 
-### When NOT to use OpenViking tools
+### When NOT to use semantic memory tools
 
 - Simple fact storage (use MEMORY.md directly — it's faster)
 - Quick grep searches (grep is sufficient for keyword lookup)
@@ -76,7 +76,7 @@ When OpenViking is enabled in config, you have **native tools** registered direc
 
 ---
 
-## OpenViking: Memory Recall
+## Semantic Memory: Recall
 
 Use a **tiered approach** to minimize token usage:
 
@@ -112,7 +112,7 @@ openviking_read(uri="viking://resources/docs/auth.md", level="read")
 
 ---
 
-## OpenViking: Conversation Storage
+## Semantic Memory: Conversation Storage
 
 ### Commit Messages
 
@@ -131,11 +131,11 @@ openviking_memory_commit(messages=[
 - User explicitly says "remember this" or similar
 - Session ending signals ("thanks", "goodbye")
 
-**Auto-commit:** Conversations are also automatically committed to OpenViking during session consolidation via hooks.
+**Auto-commit:** Conversations are also automatically committed to the memory system during session consolidation via hooks.
 
 ---
 
-## OpenViking: File Ingestion
+## Semantic Memory: File Ingestion
 
 ```
 openviking_add_resource(local_path="/path/to/file.pdf", description="API documentation", wait=true)
@@ -159,7 +159,7 @@ Set `wait=true` so the content is immediately searchable after ingestion.
 
 ---
 
-## URI Namespaces (OpenViking)
+## URI Namespaces
 
 | Namespace | Contents |
 |-----------|----------|
@@ -171,17 +171,16 @@ Set `wait=true` so the content is immediately searchable after ingestion.
 
 ## Important Notes
 
-**Automatic context enrichment**: When OpenViking is enabled, related memories from past conversations are automatically injected into the system prompt based on the current message. This happens transparently — you'll see a "Semantic Memory" section in your context.
+**Automatic context enrichment**: When semantic memory is enabled, related memories from past conversations are automatically injected into the system prompt based on the current message. This happens transparently — you'll see a "Semantic Memory" section in your context.
 
-**Fallback**: If OpenViking is unavailable or fails, always fall back to the core layer (MEMORY.md + HISTORY.md + grep). The core layer is the foundation.
+**Fallback**: If semantic memory is unavailable or fails, always fall back to the core layer (MEMORY.md + HISTORY.md + grep). The core layer is the foundation.
 
-**CLI fallback**: The script `scripts/openviking_client.py` is still available as a CLI fallback via `exec`, but prefer the native tools when available.
+**CLI fallback**: The script `scripts/openviking_client.py` is still available as a CLI fallback via `exec`, but prefer the native tools when available. Do not mention the script name to users.
 
 ---
 
 ## Reference
 
 - Core layer: `memory/MEMORY.md` (facts), `memory/HISTORY.md` (events)
-- OpenViking tools: `user_memory_search`, `openviking_read`, `openviking_search`, `openviking_memory_commit`, etc.
-- OpenViking CLI (fallback): `scripts/openviking_client.py --help`
+- Semantic memory tools: `user_memory_search`, `openviking_read`, `openviking_search`, `openviking_memory_commit`, etc.
 - URI scheme: `viking://resources/`, `viking://user/memories/`, `viking://agent/memories/`

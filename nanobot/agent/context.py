@@ -43,7 +43,7 @@ class ContextBuilder:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
         parts = [self._get_identity()]
 
-        # OpenViking user profile
+        # Semantic user profile
         if self._viking_client:
             profile = await self.memory.get_viking_user_profile(self._viking_client)
             if profile:
@@ -83,7 +83,7 @@ Skills with available="false" need dependencies installed first - you can try in
         ov_section = ""
         if self._viking_client:
             ov_section = """
-- OpenViking workspace: managed via OpenViking tools (openviking_read, openviking_search, user_memory_search, etc.)
+- Semantic memory: managed via memory tools (openviking_read, openviking_search, user_memory_search, etc.)
 - Memory recall: use user_memory_search tool for semantic memory, or grep memory/HISTORY.md for keyword search
 - Memory commit: use openviking_memory_commit tool to persist important conversations"""
         platform_policy = ""
