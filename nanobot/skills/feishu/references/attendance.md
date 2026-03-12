@@ -42,6 +42,39 @@ python3 ${SKILL_DIR}/scripts/feishu_api.py attendance query --user-ids 6xxx --da
 1. 先用 `get_user_employee_id(open_id)` 获取 employee_id
 2. 再用 `get_attendance([employee_id], date_from, date_to)` 查询打卡
 
+## 打卡状态码
+
+| 值 | 含义 |
+|----|------|
+| `Normal` | 正常 |
+| `Late` | 迟到 |
+| `Early` | 早退 |
+| `Lack` | 缺卡 |
+| `Todo` | 未打卡 |
+| `NoNeedCheck` | 无需打卡 |
+
+## 日期格式
+
+考勤 API 的日期格式是 `yyyyMMdd` **整数**（不是字符串，不是时间戳）：
+
+```python
+# 正确
+date_from=20260301
+
+# 错误
+date_from="2026-03-01"     # 不是字符串
+date_from=1739059200        # 不是 Unix 时间戳
+```
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 用 open_id 调考勤 API | 先用 `get_user_employee_id(open_id)` 转换为 employee_id |
+| 日期格式传字符串或时间戳 | 必须是 yyyyMMdd 整数如 `20260209` |
+| 一次查超过 50 人 | `user_ids` 最多 50 个，需分批 |
+| 未申请 `contact:user.employee_id:readonly` | open_id 转 employee_id 必需此权限 |
+
 ## 所需权限
 
 - `contact:user.employee_id:readonly` — 获取 employee_id

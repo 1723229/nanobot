@@ -105,6 +105,34 @@ python3 ${SKILL_DIR}/scripts/feishu_api.py wiki search --keyword "开发规范" 
 | mindnote | 思维导图 |
 | file | 文件 |
 
+## Wiki-Doc 工作流（关键）
+
+知识库页面的内容读写必须通过 doc API：
+
+```python
+# 1. 获取节点详情 → 拿到 obj_token
+node_data = wiki_get_node("space_id", "node_token")
+obj_token = node_data["node"]["obj_token"]
+
+# 2. 用 obj_token 作为 document_id 读取文档
+content = read_doc(obj_token)
+```
+
+**不要用 `node_token` 或 URL 中的 token 直接调用 doc API，必须用 `wiki_get_node()` 返回的 `obj_token`。**
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 用 wiki URL 中的 token 直接调用 doc API | 必须先 `wiki_get_node()` 获取 `obj_token` |
+| 列出空间返回空但实际有内容 | 机器人未被添加为空间成员 |
+| 混淆 `node_token` 和 `obj_token` | `node_token` 是知识库节点标识，`obj_token` 是实际文档标识 |
+| 创建节点时忘记指定 `obj_type` | 需要传 `"docx"` 等类型 |
+
+## 知识库访问设置
+
+机器人需要被添加为知识空间成员：知识空间 → 设置 → 成员管理 → 添加机器人。
+
 ## 所需权限
 
 - `wiki:wiki:readonly` — 查看知识库

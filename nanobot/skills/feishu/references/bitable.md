@@ -204,6 +204,50 @@ python3 ${SKILL_DIR}/scripts/feishu_api.py bitable task-query --limit 10
 - `table_id`: 数据表 ID，如 `tblYWOnDxGsVSfDN`
 - `record_id`: 记录 ID，如 `recXXX`
 
+### 从 URL 提取 app_token
+
+| URL 格式 | 说明 |
+|----------|------|
+| `https://xxx.feishu.cn/base/{app_token}?table=tblXXX` | 直接提取 `app_token` |
+| `https://xxx.feishu.cn/wiki/{node_token}?table=tblXXX` | 需先通过 Wiki API 的 `wiki_get_node` 获取 `obj_token` |
+
+## 字段类型与写入格式
+
+| 类型编号 | 字段类型 | 写入格式 | 示例 |
+|----------|----------|----------|------|
+| 1 | 多行文本 | string | `"Hello"` |
+| 2 | 数字 | number | `2323.23` |
+| 3 | 单选 | string | `"选项1"` |
+| 4 | 多选 | string[] | `["选项1", "选项2"]` |
+| 5 | 日期 | number（毫秒时间戳） | `1690992000000` |
+| 7 | 复选框 | boolean | `true` |
+| 11 | 人员 | object[] | `[{"id": "ou_xxx"}]` |
+| 13 | 电话号码 | string | `"13800138000"` |
+| 15 | 超链接 | object | `{"text": "链接", "link": "https://..."}` |
+| 17 | 附件 | object[] | `[{"file_token": "xxx"}]` |
+| 18 | 单向关联 | string[] | `["recXXX"]` |
+| 19 | 查找引用 | — | 只读，由关联字段自动计算 |
+| 20 | 公式 | — | 只读，由公式自动计算 |
+| 21 | 双向关联 | string[] | `["recXXX"]` |
+| 22 | 地理位置 | object | `{"location": "北京市朝阳区"}` |
+| 23 | 群组 | string[] | `["oc_xxx"]` |
+| 1001 | 创建时间 | — | 只读 |
+| 1002 | 修改时间 | — | 只读 |
+| 1003 | 创建人 | — | 只读 |
+| 1004 | 修改人 | — | 只读 |
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 应用无法访问已有多维表格 | 需先将应用添加为协作者：文档右上角「...」→「更多」→「添加文档应用」 |
+| 日期字段传 ISO 字符串 | 必须传毫秒时间戳数字，如 `1690992000000` |
+| 人员字段传字符串 | 必须传 `[{"id": "ou_xxx"}]` 数组格式 |
+| 单选/多选传不存在的选项 | 选项会自动创建，注意拼写一致 |
+| `app_token` 和 `table_id` 搞混 | `app_token` 是多维表格级别，`table_id` 是数据表级别 |
+| `/wiki/` URL 直接当 app_token 用 | Wiki URL 的 token 是 node_token，需先 `wiki_get_node()` 获取 `obj_token` |
+| 写入只读字段 | 类型 19/20/1001-1004 为只读，不能通过 API 写入 |
+
 ## 所需权限
 
 - `bitable:app` — 多维表格完整权限

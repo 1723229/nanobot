@@ -67,6 +67,14 @@ python3 ${SKILL_DIR}/scripts/feishu_api.py chat members --chat-id oc_xxx --all
 python3 ${SKILL_DIR}/scripts/feishu_api.py chat members --chat-id oc_xxx --limit 50
 ```
 
+## ID 前缀对应关系
+
+| receive_id_type | ID 前缀 | 说明 |
+|-----------------|---------|------|
+| `chat_id` | `oc_` | 群聊 ID |
+| `open_id` | `ou_` | 用户 open_id |
+| `union_id` | `on_` | 用户 union_id |
+
 ## 所需权限
 
 - `im:chat:readonly` — 获取群组信息

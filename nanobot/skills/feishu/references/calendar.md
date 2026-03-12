@@ -151,9 +151,33 @@ data = meeting_reserve(
 )
 ```
 
+## 典型工作流
+
+### 预约会议室
+
+1. `meeting_room_search("大会议室")` → 搜索会议室
+2. `calendar_freebusy(user_ids, start, end)` → 查询忙闲
+3. `calendar_create_event(...)` → 创建日程并添加参与人
+
+### 安排团队会议
+
+1. 分别查询每位成员忙闲 → `calendar_freebusy()`
+2. 找到共同空闲时间段
+3. 搜索可用会议室
+4. 创建日程并添加参与人和会议室
+
 ## 时间格式
 
 日历 API 使用 RFC3339 格式：`2026-03-12T14:00:00+08:00`
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 时间传 Unix 时间戳 | 日历 API 需要 RFC3339 字符串 `"2026-03-12T14:00:00+08:00"` |
+| 忘记传 `calendar_id` | 必须传 `calendar_id`，主日历用 `"primary"` |
+| 会议室查询用日历 API | 会议室在 `vc` 域下：`meeting_room_search` |
+| 以为添加会议室立即生效 | 会议室预约是异步的，需确认 `rsvp_status` |
 
 ## 所需权限
 

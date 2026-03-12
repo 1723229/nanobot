@@ -150,7 +150,57 @@ data = create_leave_approval(
 )
 ```
 
+### approval_transfer_task
+
+审批转交。
+
+```python
+from feishu_api import approval_transfer_task
+
+approval_transfer_task("E565EC28-...", "instance_code", "task_id", "ou_xxx",
+                       transfer_user_id="ou_yyy", comment="转交给主管")
+```
+
+## 如何获取 approval_code
+
+飞书不提供「列出所有审批定义」的 API，需从管理后台获取：
+
+1. 打开 [飞书审批管理后台（开发者模式）](https://www.feishu.cn/approval/admin/approvalList?devMode=on)
+2. 找到目标审批 → 点击 **编辑**
+3. 从浏览器地址栏复制 `definitionCode=` 后面的值
+
+## 常见表单控件类型
+
+| 控件类型 | 说明 | value 格式 |
+|----------|------|------------|
+| `input` | 单行文本 | `"文本内容"` |
+| `textarea` | 多行文本 | `"文本内容"` |
+| `number` | 数字 | `123.45` |
+| `date` | 日期 | `"2026-03-01T09:00:00+08:00"` (RFC3339) |
+| `leaveGroup` | 请假控件组 | `{"name":"年假","start":"...","end":"...","interval":2.0}` |
+| `radioV2` | 单选 | `"选项名称"` |
+| `checkboxV2` | 多选 | `["选项1","选项2"]` |
+
+## 典型工作流
+
+### 处理审批（审批人视角）
+
+1. `approval_list_instances(code)` → 获取实例列表
+2. `approval_get_instance(instance_code)` → 查看详情，从 `task_list` 中找到待办的 `task_id`
+3. `approval_approve_task()` 同意 / `approval_reject_task()` 拒绝 / `approval_transfer_task()` 转交
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 想用 API 列出所有审批定义 | 无此 API，从管理后台获取 approval_code |
+| form 传对象而非 JSON 字符串 | `form` 参数需要 `json.dumps([...])` |
+| 忘记传 `task_id` 执行同意/拒绝 | 先通过 `approval_get_instance` 获取 task_id |
+| 撤回失败 | 检查审批定义是否允许撤回 |
+| 请假日期格式错误 | 必须用 RFC3339 格式 `"2026-03-01T00:00:00+08:00"` |
+
 ## 所需权限
 
 - `approval:approval` — 审批完整权限
 - `approval:approval:readonly` — 只读权限
+- `approval:task` — 审批人操作（同意/拒绝/转交）

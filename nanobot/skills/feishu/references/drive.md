@@ -97,9 +97,39 @@ drive_add_permission(
 )
 ```
 
+## 文件类型参考
+
+| 类型 | 说明 |
+|------|------|
+| `doc` | 旧版文档 |
+| `docx` | 新版文档 |
+| `sheet` | 电子表格 |
+| `bitable` | 多维表格 |
+| `folder` | 文件夹 |
+| `file` | 上传的文件 |
+| `mindnote` | 思维导图 |
+
+## 权限级别参考
+
+| 权限值 | 说明 |
+|--------|------|
+| `view` | 仅查看 |
+| `edit` | 可编辑 |
+| `full_access` | 完全访问（可管理权限） |
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 机器人不指定 folder_token 创建文件夹 | 机器人没有「我的空间」，必须指定已共享给机器人的 folder_token |
+| move/delete 时 type 参数搞错 | type 必须与文件实际类型一致 |
+| 文件不在机器人可访问范围内 | 需先将文件/文件夹共享给机器人应用 |
+| 权限 token_type 与文件实际类型不匹配 | `token_type` 必须与目标文件类型一致（docx/sheet/bitable 等） |
+
 ## 所需权限
 
 - `drive:drive` — 云空间完整权限
 - `drive:drive:readonly` — 只读权限
 - `drive:file:upload` — 上传文件
 - `drive:file:download` — 下载文件
+- `drive:permission` — 管理文档权限

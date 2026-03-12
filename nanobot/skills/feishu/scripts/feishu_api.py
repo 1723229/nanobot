@@ -3,7 +3,7 @@
 feishu_api - 飞书统一 API 客户端
 
 合并群组、消息、通讯录、考勤、云文档、多维表格、审批、日历、任务、知识库、
-云空间、百科、人事等模块，消除重复的凭据加载和 token 获取逻辑。
+云空间等模块，消除重复的凭据加载和 token 获取逻辑。
 
 凭据获取优先级: ~/.hiperone/config.json > 环境变量
 """
@@ -627,6 +627,28 @@ def approval_reject_task(
                  params={"user_id_type": "open_id"}, action="审批拒绝")
 
 
+def approval_transfer_task(
+    approval_code: str,
+    instance_code: str,
+    task_id: str,
+    user_id: str,
+    transfer_user_id: str,
+    comment: str = "",
+) -> Dict[str, Any]:
+    """审批任务转交"""
+    payload: Dict[str, Any] = {
+        "approval_code": approval_code,
+        "instance_code": instance_code,
+        "task_id": task_id,
+        "user_id": user_id,
+        "transfer_user_id": transfer_user_id,
+    }
+    if comment:
+        payload["comment"] = comment
+    return _post("/approval/v4/tasks/transfer", payload,
+                 params={"user_id_type": "open_id"}, action="审批转交")
+
+
 def approval_list_comments(instance_id: str, page_size: int = 50) -> Dict[str, Any]:
     """获取审批实例评论"""
     return _get(f"/approval/v4/instances/{instance_id}/comments",
@@ -1079,91 +1101,6 @@ def drive_add_permission(
                  params={"type": token_type}, action="添加文档权限")
 
 
-# ============================================================
-# 百科 (baike/v1)
-# ============================================================
-
-def baike_search(query: str, page_size: int = 20) -> Dict[str, Any]:
-    """搜索百科词条"""
-    return _post("/baike/v1/entities/search",
-                 {"query": query, "page_size": page_size}, action="搜索百科词条")
-
-
-def baike_get_entity(entity_id: str) -> Dict[str, Any]:
-    """获取百科词条详情"""
-    return _get(f"/baike/v1/entities/{entity_id}", action="获取百科词条详情")
-
-
-def baike_create_entity(
-    main_keys: List[str],
-    description: str,
-    aliases: Optional[List[str]] = None,
-) -> Dict[str, Any]:
-    """创建百科词条"""
-    payload: Dict[str, Any] = {
-        "main_keys": [{"key": k, "display_status": {"allow_highlight": True, "allow_search": True}}
-                      for k in main_keys],
-        "description": description,
-    }
-    if aliases:
-        payload["aliases"] = [{"key": a, "display_status": {"allow_highlight": True, "allow_search": True}}
-                              for a in aliases]
-    return _post("/baike/v1/entities", payload, action="创建百科词条")
-
-
-def baike_update_entity(entity_id: str, fields: dict) -> Dict[str, Any]:
-    """更新百科词条"""
-    return _put(f"/baike/v1/entities/{entity_id}", fields, action="更新百科词条")
-
-
-def baike_highlight(content: str) -> Dict[str, Any]:
-    """词条高亮（在文本中标记匹配的词条）"""
-    return _post("/baike/v1/entities/highlight", {"text": content}, action="百科词条高亮")
-
-
-# ============================================================
-# 人事 / 请假记录 (corehr/v1)
-# ============================================================
-
-def hr_leave_request_history(
-    employment_id: str = "",
-    leave_type_id: str = "",
-    start_date: str = "",
-    end_date: str = "",
-    page_size: int = 50,
-    page_token: str = "",
-    user_id_type: str = "open_id",
-) -> Dict[str, Any]:
-    """查询请假记录
-
-    Args:
-        employment_id: 雇员 ID
-        start_date: "2026-01-01"
-        end_date: "2026-03-12"
-    """
-    params: Dict[str, Any] = {
-        "page_size": page_size,
-        "user_id_type": user_id_type,
-    }
-    if employment_id:
-        params["employment_id"] = employment_id
-    if leave_type_id:
-        params["leave_type_id"] = leave_type_id
-    if start_date:
-        params["start_date"] = start_date
-    if end_date:
-        params["end_date"] = end_date
-    if page_token:
-        params["page_token"] = page_token
-    return _get("/corehr/v1/leaves/leave_request_history", params,
-                action="查询请假记录")
-
-
-def hr_get_employee(employment_id: str, user_id_type: str = "open_id") -> Dict[str, Any]:
-    """查询员工花名册信息"""
-    return _get(f"/corehr/v1/employments/{employment_id}",
-                {"user_id_type": user_id_type}, action="查询员工信息")
-
 
 # ============================================================
 # CLI
@@ -1350,28 +1287,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--file-token", required=True)
     p.add_argument("--save-path", required=True)
 
-    # --- baike ---
-    p_bk = sub.add_parser("baike", help="百科")
-    bks = p_bk.add_subparsers(dest="action")
-    p = bks.add_parser("search", help="搜索词条")
-    p.add_argument("--query", required=True)
-    p.add_argument("--limit", type=int, default=20)
-    p = bks.add_parser("get", help="获取词条详情")
-    p.add_argument("--entity-id", required=True)
-    p = bks.add_parser("highlight", help="词条高亮")
-    p.add_argument("--text", required=True)
-
-    # --- hr ---
-    p_hr = sub.add_parser("hr", help="人事")
-    hrs = p_hr.add_subparsers(dest="action")
-    p = hrs.add_parser("leave-history", help="请假记录")
-    p.add_argument("--employment-id", default="")
-    p.add_argument("--start-date", default="")
-    p.add_argument("--end-date", default="")
-    p.add_argument("--limit", type=int, default=50)
-    p = hrs.add_parser("employee", help="员工信息")
-    p.add_argument("--employment-id", required=True)
-
     return parser
 
 
@@ -1491,21 +1406,6 @@ def _run_cli(args: argparse.Namespace) -> None:
             _pp(drive_upload_file(args.file, args.parent_node))
         elif act == "download":
             print(drive_download_file(args.file_token, args.save_path))
-
-    elif mod == "baike":
-        if act == "search":
-            _pp(baike_search(args.query, args.limit))
-        elif act == "get":
-            _pp(baike_get_entity(args.entity_id))
-        elif act == "highlight":
-            _pp(baike_highlight(args.text))
-
-    elif mod == "hr":
-        if act == "leave-history":
-            _pp(hr_leave_request_history(args.employment_id, start_date=args.start_date,
-                                         end_date=args.end_date, page_size=args.limit))
-        elif act == "employee":
-            _pp(hr_get_employee(args.employment_id))
 
 
 def main() -> int:

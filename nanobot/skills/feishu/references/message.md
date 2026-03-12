@@ -93,6 +93,26 @@ python3 ${SKILL_DIR}/scripts/feishu_api.py message history --chat-id oc_xxx --li
 | interactive | 卡片 JSON |
 | image | `{"image_key": "img_xxx"}` |
 
+## @ 用户语法
+
+在文本消息中 @ 用户：`{"text": "<at user_id=\"ou_xxx\">张三</at> 请查看"}`
+
+## 使用限制
+
+- 向同一用户发消息限频：**5 QPS**
+- 向同一群组发消息限频：群内机器人共享 **5 QPS**
+- 文本消息最大 **150 KB**
+- 卡片/富文本消息最大 **30 KB**
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| `content` 传对象 | 必须 `json.dumps({"text": "hello"})` |
+| 群聊 ID 用 `open_id` 类型 | `oc_` 开头的是 `chat_id` |
+| 富文本 content 不是二维数组 | `content: [[{"tag":"text", "text":"..."}]]` 外层是行数组 |
+| 忘记开启机器人能力 | 应用能力 → 添加机器人 |
+
 ## 所需权限
 
 - `im:message:send_as_bot` — 发送消息
