@@ -51,7 +51,8 @@ class SelfImprovementHook(Hook):
         if not result_str:
             return {"tool_name": tool_name, "result": result}
 
-        has_nonzero_exit = bool(_EXIT_CODE_RE.search(result_str))
+        m = _EXIT_CODE_RE.search(result_str)
+        has_nonzero_exit = bool(m and m.group(1) != "0")
         has_error_pattern = bool(_ERROR_PATTERNS.search(result_str))
 
         if has_nonzero_exit or has_error_pattern:

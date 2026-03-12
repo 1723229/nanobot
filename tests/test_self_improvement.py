@@ -319,9 +319,9 @@ class TestHookEdgeCases:
     async def test_exit_code_zero_does_not_trigger(
         self, hook: SelfImprovementHook, ctx: HookContext
     ) -> None:
-        """Exit code 0 is success, should not appear in ExecTool output but verify no match."""
+        """Exit code 0 is success — should not trigger the reminder."""
         result = await hook.execute(ctx, tool_name="exec", result="some output\nExit code: 0")
-        assert "[self-improvement]" in result["result"]
+        assert "[self-improvement]" not in result["result"]
 
 
 class TestReminderContent:
