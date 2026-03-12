@@ -14,24 +14,6 @@ allowed-tools: Bash(agent-browser:*)
 
 ## Installation
 
-### npm recommended
-
-```bash
-npm install -g agent-browser
-agent-browser install
-agent-browser install --with-deps
-```
-
-### From Source
-
-```bash
-git clone https://github.com/vercel-labs/agent-browser
-cd agent-browser
-pnpm install
-pnpm build
-agent-browser install
-```
-
 ## Quick start
 
 ```bash

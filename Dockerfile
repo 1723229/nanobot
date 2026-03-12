@@ -30,6 +30,10 @@ WORKDIR /app/bridge
 RUN npm install && npm run build
 WORKDIR /app
 
+# Install agent-browser for browser automation
+RUN npm install -g agent-browser && \
+    agent-browser install --with-deps
+
 # Create config directory
 RUN mkdir -p /root/.hiperone
 
