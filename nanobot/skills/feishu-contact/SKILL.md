@@ -7,21 +7,77 @@ metadata:
       name: python3
 ---
 
-# 飞书通讯录
+# 飞书通讯录 (Contact)
+
+飞书通讯录 API，查询用户信息和部门组织结构。
 
 ## 使用流程
 
-1. 阅读 `references/contact.md` 获取函数签名和参数说明
-2. 通过 `exec` 工具调用脚本执行操作
+1. 根据下方 API 函数说明确认所需操作
+2. 通过 `exec` 工具调用脚本执行
 
-## CLI 示例
+## API 函数
 
-```bash
-python3 scripts/feishu_contact.py user --user-id ou_xxx
-python3 scripts/feishu_contact.py dept-users --department-id 0 --limit 50
-python3 scripts/feishu_contact.py dept --department-id od_xxx
-python3 scripts/feishu_contact.py dept-children --parent-id 0
+### get_user
+
+获取用户信息。
+
 ```
+python3 scripts/feishu_contact.py user --user-id ou_xxx --id-type open_id
+```
+
+返回: user -> {open_id, name, en_name, email, mobile, avatar, department_ids, employee_id, ...}
+
+### list_department_users
+
+获取部门下用户列表（"0" 表示根部门）。
+
+```
+python3 scripts/feishu_contact.py dept-users --department-id 0 --limit 50
+```
+
+### get_department
+
+获取部门信息。
+
+```
+python3 scripts/feishu_contact.py dept --department-id od_xxx
+```
+
+### list_departments
+
+获取子部门列表。
+
+```
+python3 scripts/feishu_contact.py dept-children --parent-id 0 --limit 50
+```
+
+## 用户 ID 类型说明
+
+| user_id_type | 前缀 | 说明 |
+|--------------|------|------|
+| `open_id` | `ou_` | 应用级唯一标识（默认） |
+| `union_id` | `on_` | 跨应用统一标识 |
+| `user_id` | 无固定前缀 | 企业内用户 ID |
+
+## 常见错误
+
+| 错误 | 正确做法 |
+|------|----------|
+| 未配置通讯录权限范围 | 安全设置 → 通讯录权限范围 → 全部成员 |
+| 部门 ID 类型不匹配 | `od_` 开头用 `open_department_id`，纯数字用 `department_id` |
+| 忘记传 `user_id_type` 参数 | 不传默认 `open_id`，注意和实际传入的 ID 类型一致 |
+| 分页获取不完整 | 检查 `has_more` 和 `page_token` 是否需要翻页 |
+
+## 所需权限
+
+- `contact:user.base:readonly` — 获取用户基本信息
+- `contact:user.employee_id:readonly` — 获取员工工号
+- `contact:user.email:readonly` — 获取用户邮箱
+- `contact:user.phone:readonly` — 获取用户手机号
+- `contact:department.base:readonly` — 获取部门基本信息
+
+**重要**：还需要在「飞书管理后台 → 安全设置 → 数据权限」中将「通讯录权限范围」设置为「全部成员」，否则只能获取到机器人所在群的成员。
 
 ## 凭据
 
