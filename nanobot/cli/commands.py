@@ -817,10 +817,13 @@ def web(
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
         brave_api_key=config.tools.web.search.api_key or None,
+        web_proxy=config.tools.web.proxy or None,
         exec_config=config.tools.exec,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
         openviking_config=config.openviking,
     )
 
@@ -873,6 +876,23 @@ def web(
                 cron_tool.reset_cron_context(cron_token)
     cron.on_job = on_cron_job
 
+    # Channel manager (web channel will be created here since we set enabled=True)
+    channels = ChannelManager(config, bus, session_manager=session_manager, cron_service=cron)
+
+    def _pick_heartbeat_target() -> tuple[str, str]:
+        """Pick a routable channel/chat target for heartbeat-triggered messages."""
+        enabled = set(channels.enabled_channels)
+        for item in session_manager.list_sessions():
+            key = item.get("key") or ""
+            if ":" not in key:
+                continue
+            ch, cid = key.split(":", 1)
+            if ch in {"cli", "system"}:
+                continue
+            if ch in enabled and cid:
+                return ch, cid
+        return "cli", "direct"
+
     # Create heartbeat service
     async def on_heartbeat_execute(tasks: str) -> str:
         """Phase 2: execute heartbeat tasks through the full agent loop."""
@@ -907,9 +927,6 @@ def web(
         interval_s=hb_cfg.interval_s,
         enabled=hb_cfg.enabled,
     )
-
-    # Channel manager (web channel will be created here since we set enabled=True)
-    channels = ChannelManager(config, bus, session_manager=session_manager, cron_service=cron)
 
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
