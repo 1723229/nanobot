@@ -1,6 +1,6 @@
 ---
 name: feishu-bitable
-description: 飞书多维表格 — 数据表 CRUD、智能字段转换、日报/任务录入、批量操作
+description: 飞书多维表格 — 数据表 CRUD、智能字段转换、日报/任务录入、批量操作。当用户提及多维表格、bitable、数据表、日报录入、任务录入、写日报、记录任务时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

@@ -1,6 +1,6 @@
 ---
 name: feishu-wiki
-description: 飞书知识库 — 知识空间列表、节点管理、搜索
+description: 飞书知识库 — 知识空间列表、节点管理、搜索。当用户提及知识库、wiki、知识空间、文档搜索、知识管理时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

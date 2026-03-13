@@ -1,6 +1,6 @@
 ---
 name: feishu-message
-description: 飞书消息收发 — 发送/回复/撤回/转发消息、图片文件上传、消息卡片、表情回复
+description: 飞书消息收发 — 发送/回复/撤回/转发消息、图片文件上传、消息卡片、表情回复。当用户提及发消息、发飞书、撤回消息、转发、消息卡片、发图片、send message时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

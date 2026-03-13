@@ -1,6 +1,6 @@
 ---
 name: feishu-chat
-description: 飞书群组管理 — 群 CRUD、成员管理、群信息维护
+description: 飞书群组管理 — 群 CRUD、成员管理、群信息维护。当用户提及群组、建群、群成员、拉人进群、群管理、chat group时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

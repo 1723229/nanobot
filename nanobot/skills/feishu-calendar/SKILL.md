@@ -1,6 +1,6 @@
 ---
 name: feishu-calendar
-description: 飞书日历与日程 — 日历列表、日程 CRUD、忙闲查询、会议室
+description: 飞书日历与日程 — 日历列表、日程 CRUD、忙闲查询、会议室。当用户提及日历、日程、会议、约会、忙闲、会议室预订、schedule、calendar时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

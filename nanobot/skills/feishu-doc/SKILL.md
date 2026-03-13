@@ -1,6 +1,6 @@
 ---
 name: feishu-doc
-description: 飞书云文档 — 文件列表、读取文档内容、搜索文档
+description: 飞书云文档 — 文件列表、读取文档内容、搜索文档。当用户提及云文档、飞书文档、读文档、文档内容、docx、doc时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

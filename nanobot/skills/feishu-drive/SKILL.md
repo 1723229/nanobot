@@ -1,6 +1,6 @@
 ---
 name: feishu-drive
-description: 飞书云空间/文件管理 — 文件列表、搜索、文件夹创建、上传/下载、权限管理
+description: 飞书云空间/文件管理 — 文件列表、搜索、文件夹创建、上传/下载、权限管理。当用户提及云空间、云盘、飞书文件、上传文件、下载文件、文件权限、drive时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

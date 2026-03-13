@@ -1,6 +1,6 @@
 ---
 name: feishu-approval
-description: 飞书审批 — 审批定义查询、实例管理、请假审批
+description: 飞书审批 — 审批定义查询、实例管理、请假审批。当用户提及审批、请假、调休、加班申请、审批流程、approval时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

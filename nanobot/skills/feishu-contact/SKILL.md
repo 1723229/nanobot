@@ -1,6 +1,6 @@
 ---
 name: feishu-contact
-description: 飞书通讯录 — 用户信息查询、部门与子部门列表
+description: 飞书通讯录 — 用户信息查询、部门与子部门列表。当用户提及通讯录、查人、查员工、部门列表、组织架构、open_id、user_id时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

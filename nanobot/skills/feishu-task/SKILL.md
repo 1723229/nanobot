@@ -1,6 +1,6 @@
 ---
 name: feishu-task
-description: 飞书任务管理 — 任务 CRUD、任务清单管理
+description: 飞书任务管理 — 任务 CRUD、任务清单管理。当用户提及飞书任务、创建任务、任务清单、待办、todo、task时，务必先读取此技能。
 metadata:
   requires:
     - type: binary

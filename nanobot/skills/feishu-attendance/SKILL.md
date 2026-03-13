@@ -1,6 +1,6 @@
 ---
 name: feishu-attendance
-description: 飞书考勤 — 查询员工打卡记录
+description: 飞书考勤 — 查询员工打卡记录。当用户提及考勤、打卡、出勤、迟到、早退、工时统计时，务必先读取此技能。
 metadata:
   requires:
     - type: binary
