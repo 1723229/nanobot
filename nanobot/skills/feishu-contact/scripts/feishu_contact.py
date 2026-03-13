@@ -136,6 +136,24 @@ def list_departments(
     return _get("/contact/v3/departments", params, action="获取子部门列表")
 
 
+def batch_get_user_id(
+    mobiles: Optional[List[str]] = None,
+    emails: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """通过手机号或邮箱批量查询 open_id
+
+    至少提供 mobiles 或 emails 其中之一。
+    """
+    payload: Dict[str, Any] = {}
+    if mobiles:
+        payload["mobiles"] = mobiles
+    if emails:
+        payload["emails"] = emails
+    return _post("/contact/v3/users/batch_get_id",
+                 payload, params={"user_id_type": "open_id"},
+                 action="批量查询用户 ID")
+
+
 # ============================================================
 # CLI
 # ============================================================
@@ -154,6 +172,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dept-children", help="子部门列表")
     p.add_argument("--parent-id", default="0")
     p.add_argument("--limit", type=int, default=50)
+    p = sub.add_parser("search", help="通过手机号/邮箱查 open_id")
+    p.add_argument("--mobiles", default="", help="逗号分隔的手机号")
+    p.add_argument("--emails", default="", help="逗号分隔的邮箱")
     return parser
 
 
@@ -167,6 +188,13 @@ def _run_cli(args: argparse.Namespace) -> None:
         _pp(get_department(args.department_id))
     elif act == "dept-children":
         _pp(list_departments(args.parent_id, page_size=args.limit))
+    elif act == "search":
+        mobiles = [m.strip() for m in args.mobiles.split(",") if m.strip()] if args.mobiles else None
+        emails = [e.strip() for e in args.emails.split(",") if e.strip()] if args.emails else None
+        if not mobiles and not emails:
+            print("错误: 请提供 --mobiles 或 --emails 至少其一", file=sys.stderr)
+            return
+        _pp(batch_get_user_id(mobiles, emails))
 
 
 def main() -> int:

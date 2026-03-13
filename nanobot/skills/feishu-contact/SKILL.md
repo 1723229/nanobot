@@ -1,6 +1,6 @@
 ---
 name: feishu-contact
-description: 飞书通讯录 — 用户信息查询、部门与子部门列表。当用户提及通讯录、查人、查员工、部门列表、组织架构、open_id、user_id时，务必先读取此技能。
+description: 飞书通讯录 — 用户信息查询、部门与子部门列表、通过手机号/邮箱查 open_id。当用户提及通讯录、查人、查员工、部门列表、组织架构、open_id、user_id、手机号查人、邮箱查人时，务必先读取此技能。
 metadata:
   requires:
     - type: binary
@@ -52,6 +52,18 @@ python3 scripts/feishu_contact.py dept --department-id od_xxx
 python3 scripts/feishu_contact.py dept-children --parent-id 0 --limit 50
 ```
 
+### batch_get_user_id (search)
+
+通过手机号或邮箱批量查询 open_id。
+
+```
+python3 scripts/feishu_contact.py search --mobiles "13800138000,13900139000"
+python3 scripts/feishu_contact.py search --emails "zhang@example.com,li@example.com"
+python3 scripts/feishu_contact.py search --mobiles "13800138000" --emails "zhang@example.com"
+```
+
+返回: {user_list: [{user_id, mobile, email}, ...]}
+
 ## 用户 ID 类型说明
 
 | user_id_type | 前缀 | 说明 |
@@ -76,6 +88,7 @@ python3 scripts/feishu_contact.py dept-children --parent-id 0 --limit 50
 - `contact:user.email:readonly` — 获取用户邮箱
 - `contact:user.phone:readonly` — 获取用户手机号
 - `contact:department.base:readonly` — 获取部门基本信息
+- `contact:user.id:readonly` — 通过手机号/邮箱查询 open_id
 
 **重要**：还需要在「飞书管理后台 → 安全设置 → 数据权限」中将「通讯录权限范围」设置为「全部成员」，否则只能获取到机器人所在群的成员。
 

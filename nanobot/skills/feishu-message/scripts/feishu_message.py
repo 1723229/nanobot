@@ -289,6 +289,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--receive-id", required=True)
     p.add_argument("--id-type", default="chat_id")
 
+    p = sub.add_parser("reply", help="回复消息")
+    p.add_argument("--message-id", required=True)
+    p.add_argument("--text", required=True)
+
     p = sub.add_parser("react", help="添加表情回复")
     p.add_argument("--message-id", required=True)
     p.add_argument("--emoji", required=True, help="SMILE|THUMBSUP|HEART|CLAP|...")
@@ -325,6 +329,8 @@ def _run_cli(args: argparse.Namespace) -> None:
         _pp(recall_message(args.message_id))
     elif act == "forward":
         _pp(forward_message(args.message_id, args.receive_id, args.id_type))
+    elif act == "reply":
+        _pp(reply_message(args.message_id, "text", json.dumps({"text": args.text})))
     elif act == "react":
         _pp(add_reaction(args.message_id, args.emoji))
     elif act == "reactions":

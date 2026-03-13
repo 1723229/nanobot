@@ -76,6 +76,19 @@ def _post(path: str, payload: Optional[dict] = None, *, params: Optional[dict] =
     return _check(resp.json(), action or path)
 
 
+def _patch(path: str, payload: Optional[dict] = None, *, params: Optional[dict] = None,
+           timeout: int = 10, action: str = "") -> dict:
+    resp = requests.patch(f"{BASE_URL}{path}", headers=_headers(), json=payload,
+                          params=params, timeout=timeout)
+    return _check(resp.json(), action or path)
+
+
+def _delete(path: str, *, params: Optional[dict] = None,
+            timeout: int = 10, action: str = "") -> dict:
+    resp = requests.delete(f"{BASE_URL}{path}", headers=_headers(), params=params, timeout=timeout)
+    return _check(resp.json(), action or path)
+
+
 def _pp(data: Any) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
@@ -108,6 +121,72 @@ def read_doc(document_id: str) -> str:
     return _extract_text_from_blocks(all_blocks)
 
 
+def get_doc(document_id: str) -> Dict:
+    """获取文档元信息（标题、创建时间、修订版本等）"""
+    return _get(f"/docx/v1/documents/{document_id}", action="获取文档信息").get("document", {})
+
+
+def create_doc(title: str, folder_token: str = "") -> Dict:
+    """创建云文档，返回 document_id 和 url"""
+    params: Dict[str, Any] = {}
+    if folder_token:
+        params["folder_token"] = folder_token
+    payload: Dict[str, Any] = {"title": title}
+    data = _post("/docx/v1/documents", payload, params=params, action="创建文档")
+    doc = data.get("document", {})
+    return {
+        "document_id": doc.get("document_id", ""),
+        "revision_id": doc.get("revision_id", 1),
+        "title": doc.get("title", title),
+        "url": f"https://pgnrxubfqk.feishu.cn/docx/{doc.get('document_id', '')}",
+    }
+
+
+def create_blocks(document_id: str, block_id: str, children: List[Dict], index: int = -1) -> Dict:
+    """在文档中创建内容块
+
+    飞书 API 要求所有文本类 block 都使用 "text" 作为内容 key:
+    [
+      {"block_type": 2, "text": {"elements": [{"text_run": {"content": "Hello"}}]}},
+      {"block_type": 3, "text": {"elements": [{"text_run": {"content": "标题"}}]}}
+    ]
+    block_type: 2=paragraph, 3=heading1, 4=heading2, 5=heading3,
+                7=bullet_list, 8=number_list, 10=code, 11=quote
+    """
+    payload: Dict[str, Any] = {"children": children}
+    if index >= 0:
+        payload["index"] = index
+    data = _post(f"/docx/v1/documents/{document_id}/blocks/{block_id}/children",
+                 payload, action="创建内容块")
+    return data
+
+
+def _make_text_element(content: str) -> Dict:
+    """构造一个 text_run 元素"""
+    return {"text_run": {"content": content, "text_element_style": {}}}
+
+
+def create_text_blocks(document_id: str, texts: List[str], block_id: str = "") -> Dict:
+    """在文档中批量添加文本段落
+
+    texts: 文本列表，每个元素创建一个段落块
+    block_id: 父块 ID，默认为文档根块（即 document_id）
+    """
+    parent = block_id or document_id
+    children = []
+    for text in texts:
+        children.append({
+            "block_type": 2,
+            "text": {"elements": [_make_text_element(text)]}
+        })
+    return create_blocks(document_id, parent, children)
+
+
+def delete_doc(document_id: str) -> Dict:
+    """删除云文档（移至回收站）"""
+    return _delete(f"/drive/v1/files/{document_id}?type=docx", action="删除文档")
+
+
 def search_docs(keyword: str, page_size: int = 10) -> List[Dict]:
     """搜索云文档（使用 suite 搜索 API）"""
     payload = {"search_key": keyword, "count": page_size, "offset": 0, "docs_types": []}
@@ -115,10 +194,7 @@ def search_docs(keyword: str, page_size: int = 10) -> List[Dict]:
     return data.get("docs_entities", [])
 
 
-_BLOCK_TYPE_KEY = {
-    2: "paragraph", 3: "heading1", 4: "heading2", 5: "heading3",
-    7: "bulleted_list_item", 8: "numbered_list_item", 11: "quote",
-}
+_BLOCK_TYPE_TEXT = {2, 3, 4, 5, 7, 8, 11}
 _BLOCK_TYPE_PREFIX = {3: "## ", 4: "### ", 5: "#### ", 7: "- ", 8: "1. "}
 
 
@@ -141,10 +217,9 @@ def _extract_text_from_blocks(blocks: list) -> str:
         if bt == 10:
             text_parts.append("```\n" + block.get("code", {}).get("content", "") + "\n```")
             continue
-        key = _BLOCK_TYPE_KEY.get(bt)
-        if not key:
+        if bt not in _BLOCK_TYPE_TEXT:
             continue
-        elements = block.get(key, {}).get("elements", [])
+        elements = block.get("text", {}).get("elements", [])
         text = _extract_text_from_elements(elements)
         if bt == 11:
             text = "\n".join("> " + line for line in text.split("\n"))
@@ -165,11 +240,23 @@ def _build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list", help="列出文件")
     p.add_argument("--parent-node", default="")
     p.add_argument("--limit", type=int, default=20)
+    p = sub.add_parser("get", help="获取文档元信息")
+    p.add_argument("--document-id", required=True)
     p = sub.add_parser("read", help="读取文档")
     p.add_argument("--document-id", required=True)
     p = sub.add_parser("search", help="搜索文档")
     p.add_argument("--keyword", required=True)
     p.add_argument("--limit", type=int, default=10)
+    p = sub.add_parser("create", help="创建文档")
+    p.add_argument("--title", required=True, help="文档标题")
+    p.add_argument("--folder-token", default="", help="目标文件夹 token（可选）")
+    p.add_argument("--content", default="", help="初始文本内容，多段用 \\n 分隔（可选）")
+    p = sub.add_parser("create-block", help="在文档中添加内容块")
+    p.add_argument("--document-id", required=True, help="文档 ID")
+    p.add_argument("--block-id", default="", help="父块 ID（默认为文档根块）")
+    p.add_argument("--texts", required=True, help="JSON 数组，如 [\"段落1\",\"段落2\"]")
+    p = sub.add_parser("delete", help="删除文档")
+    p.add_argument("--document-id", required=True, help="文档 ID")
     return parser
 
 
@@ -177,10 +264,25 @@ def _run_cli(args: argparse.Namespace) -> None:
     act = args.action
     if act == "list":
         _pp(list_files(args.parent_node, args.limit))
+    elif act == "get":
+        _pp(get_doc(args.document_id))
     elif act == "read":
         print(read_doc(args.document_id))
     elif act == "search":
         _pp(search_docs(args.keyword, args.limit))
+    elif act == "create":
+        result = create_doc(args.title, args.folder_token)
+        if args.content:
+            raw = args.content.replace("\\n", "\n")
+            texts = [t for t in raw.split("\n") if t]
+            if texts:
+                create_text_blocks(result["document_id"], texts)
+        _pp(result)
+    elif act == "create-block":
+        texts = json.loads(args.texts)
+        _pp(create_text_blocks(args.document_id, texts, args.block_id))
+    elif act == "delete":
+        _pp(delete_doc(args.document_id))
 
 
 def main() -> int:

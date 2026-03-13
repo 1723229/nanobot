@@ -92,6 +92,14 @@ python3 scripts/feishu_message.py recall --message-id om_xxx
 python3 scripts/feishu_message.py forward --message-id om_xxx --receive-id oc_yyy
 ```
 
+### reply
+
+回复指定消息。
+
+```
+python3 scripts/feishu_message.py reply --message-id om_xxx --text "收到，已处理"
+```
+
 ### react
 
 给消息添加表情回复。

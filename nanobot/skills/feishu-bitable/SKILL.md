@@ -25,6 +25,8 @@ API 错误码映射为可读提示，快速定位问题。
 
 ### 4. 批量操作
 - `batch-add` - 批量创建记录
+- `batch-update` - 批量更新记录
+- `batch-delete` - 批量删除记录
 
 ---
 
@@ -43,6 +45,8 @@ API 错误码映射为可读提示，快速定位问题。
 | `bitable_update_record_smart` | 更新记录（智能转换格式） |
 | `bitable_delete_record` | 删除记录 |
 | `bitable_batch_add_records` | 批量创建记录（飞书批量 API，单次最多 500 条） |
+| `bitable_batch_update_records` | 批量更新记录（单次最多 500 条） |
+| `bitable_batch_delete_records` | 批量删除记录（单次最多 500 条） |
 
 ### 便捷函数
 
@@ -118,6 +122,24 @@ python3 scripts/feishu_bitable.py batch-add \
   --smart
 ```
 
+### 批量更新记录
+
+```bash
+python3 scripts/feishu_bitable.py batch-update \
+  --app-token JXdtbkkchaSXmksx6eFc2Eatn45 \
+  --table-id tblH6xn2dp6E1UtD \
+  --records '[{"record_id":"recXXX","fields":{"状态":"完成"}},{"record_id":"recYYY","fields":{"状态":"完成"}}]'
+```
+
+### 批量删除记录
+
+```bash
+python3 scripts/feishu_bitable.py batch-delete \
+  --app-token JXdtbkkchaSXmksx6eFc2Eatn45 \
+  --table-id tblH6xn2dp6E1UtD \
+  --record-ids '["recXXX","recYYY"]'
+```
+
 ### 带过滤条件查询
 
 ```bash
@@ -191,6 +213,8 @@ bitable_add_record_smart(app_token, table_id, fields2)
 | `update-smart` | 更新记录（智能转换格式） |
 | `delete` | 删除记录 |
 | `batch-add` | 批量创建记录（支持 `--smart`） |
+| `batch-update` | 批量更新记录 |
+| `batch-delete` | 批量删除记录 |
 | `daily-add` | 录入日报 |
 | `daily-query` | 查询日报 |
 | `task-add` | 录入任务 |

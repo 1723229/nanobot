@@ -81,6 +81,11 @@ def _put(path: str, payload: Optional[dict] = None, *, timeout: int = 10, action
     return _check(resp.json(), action or path)
 
 
+def _patch(path: str, payload: Optional[dict] = None, *, timeout: int = 10, action: str = "") -> dict:
+    resp = requests.patch(f"{BASE_URL}{path}", headers=_headers(), json=payload, timeout=timeout)
+    return _check(resp.json(), action or path)
+
+
 def _delete(path: str, *, timeout: int = 10, action: str = "") -> dict:
     resp = requests.delete(f"{BASE_URL}{path}", headers=_headers(), timeout=timeout)
     return _check(resp.json(), action or path)
@@ -166,8 +171,8 @@ def calendar_update_event(
     fields: dict,
 ) -> Dict[str, Any]:
     """更新日程"""
-    return _put(f"/calendar/v4/calendars/{calendar_id}/events/{event_id}",
-                fields, action="更新日程")
+    return _patch(f"/calendar/v4/calendars/{calendar_id}/events/{event_id}",
+                  fields, action="更新日程")
 
 
 def calendar_delete_event(calendar_id: str, event_id: str) -> Dict[str, Any]:
@@ -214,14 +219,33 @@ def meeting_room_search(
 
 
 def meeting_reserve(
+    start_time: str,
     end_time: str,
-    meeting_settings: Optional[dict] = None,
+    room_id: Optional[str] = None,
+    topic: str = "",
+    owner_id: str = "",
 ) -> Dict[str, Any]:
-    """预约会议"""
+    """预约会议
+
+    使用 tenant_access_token 时 owner_id 必传。
+    """
     payload: Dict[str, Any] = {"end_time": end_time}
-    if meeting_settings:
-        payload["meeting_settings"] = meeting_settings
-    return _post("/vc/v1/reserves/apply", payload, action="预约会议")
+    if owner_id:
+        payload["owner_id"] = owner_id
+    meeting_settings: Dict[str, Any] = {"topic": topic or "会议"}
+    if room_id:
+        meeting_settings["meeting_initial_type"] = 2
+        meeting_settings["call_setting"] = {
+            "callee": {
+                "id": room_id, "user_type": 3,
+                "pstn_sip_info": {"nickname": "room", "main_address": room_id},
+            }
+        }
+    if start_time:
+        payload["start_time"] = start_time
+    payload["meeting_settings"] = meeting_settings
+    return _post("/vc/v1/reserves/apply", payload,
+                 params={"user_id_type": "open_id"}, action="预约会议")
 
 
 # ============================================================
@@ -254,6 +278,14 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--end-time", required=True)
     p.add_argument("--description", default="")
 
+    p = sub.add_parser("event-update", help="更新日程")
+    p.add_argument("--calendar-id", required=True)
+    p.add_argument("--event-id", required=True)
+    p.add_argument("--summary", default="", help="新标题")
+    p.add_argument("--start-time", default="", help="新开始时间")
+    p.add_argument("--end-time", default="", help="新结束时间")
+    p.add_argument("--description", default="", help="新描述")
+
     p = sub.add_parser("event-delete", help="删除日程")
     p.add_argument("--calendar-id", required=True)
     p.add_argument("--event-id", required=True)
@@ -271,6 +303,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--start-time", required=True)
     p.add_argument("--end-time", required=True)
     p.add_argument("--room-id", default="", help="会议室 ID")
+    p.add_argument("--topic", default="", help="会议主题")
+    p.add_argument("--owner-id", default="", help="会议归属人 open_id（tenant_access_token 必传）")
 
     return parser
 
@@ -289,14 +323,30 @@ def _run_cli(args: argparse.Namespace) -> None:
     elif act == "event-create":
         _pp(calendar_create_event(args.calendar_id, args.summary,
                                   args.start_time, args.end_time, args.description))
+    elif act == "event-update":
+        fields: Dict[str, Any] = {}
+        if args.summary:
+            fields["summary"] = args.summary
+        if args.description:
+            fields["description"] = args.description
+        if args.start_time:
+            fields["start_time"] = ({"timestamp": args.start_time} if args.start_time.isdigit()
+                                    else {"date": args.start_time} if len(args.start_time) == 10
+                                    else {"timestamp": args.start_time})
+        if args.end_time:
+            fields["end_time"] = ({"timestamp": args.end_time} if args.end_time.isdigit()
+                                  else {"date": args.end_time} if len(args.end_time) == 10
+                                  else {"timestamp": args.end_time})
+        _pp(calendar_update_event(args.calendar_id, args.event_id, fields))
     elif act == "event-delete":
         _pp(calendar_delete_event(args.calendar_id, args.event_id))
     elif act == "freebusy":
         _pp(calendar_freebusy(args.user_id, args.start_time, args.end_time))
     elif act == "rooms":
-        _pp(meeting_room_search(args.query, args.limit))
+        _pp(meeting_room_search(args.query, page_size=args.limit))
     elif act == "reserve":
-        _pp(meeting_reserve(args.start_time, args.end_time, args.room_id or None))
+        _pp(meeting_reserve(args.start_time, args.end_time, args.room_id or None,
+                            args.topic, args.owner_id))
 
 
 def main() -> int:

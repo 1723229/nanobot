@@ -40,18 +40,56 @@ python3 scripts/feishu_calendar.py events --calendar-id primary --start-time "20
 创建日程。
 
 ```
-python3 scripts/feishu_calendar.py create-event --summary "团队周会" --start-time "2026-03-15T14:00:00+08:00" --end-time "2026-03-15T15:00:00+08:00" --description "讨论进展"
+python3 scripts/feishu_calendar.py event-create --calendar-id primary --summary "团队周会" --start-time "2026-03-15T14:00:00+08:00" --end-time "2026-03-15T15:00:00+08:00" --description "讨论进展"
 ```
 
-### 其他函数（通过脚本 Python API 调用）
+### calendar_update_event
 
-- `calendar_get(calendar_id)` — 获取日历信息
-- `calendar_get_event(calendar_id, event_id)` — 获取日程详情
-- `calendar_update_event(calendar_id, event_id, fields)` — 更新日程
-- `calendar_delete_event(calendar_id, event_id)` — 删除日程
-- `calendar_freebusy(user_ids, start_time, end_time)` — 查询忙闲
-- `meeting_room_search(query)` — 搜索会议室
-- `meeting_reserve(end_time, meeting_settings)` — 预约会议
+更新日程。
+
+```
+python3 scripts/feishu_calendar.py event-update --calendar-id primary --event-id EVENT_ID --summary "新标题" --start-time "2026-03-15T15:00:00+08:00" --end-time "2026-03-15T16:00:00+08:00"
+```
+
+### calendar_delete_event
+
+删除日程。
+
+```
+python3 scripts/feishu_calendar.py event-delete --calendar-id primary --event-id EVENT_ID
+```
+
+### calendar_freebusy
+
+查询忙闲信息。
+
+```
+python3 scripts/feishu_calendar.py freebusy --user-id ou_xxx --start-time "1773576000" --end-time "1773662400"
+```
+
+### meeting_room_search
+
+搜索会议室。
+
+```
+python3 scripts/feishu_calendar.py rooms --query "大会议室" --limit 10
+```
+
+### meeting_reserve
+
+预约会议。
+
+```
+python3 scripts/feishu_calendar.py reserve --start-time "1773576000" --end-time "1773579600"
+python3 scripts/feishu_calendar.py reserve --start-time "1773576000" --end-time "1773579600" --room-id ROOM_ID
+```
+
+### 其他 CLI 命令
+
+```
+python3 scripts/feishu_calendar.py get --calendar-id primary
+python3 scripts/feishu_calendar.py event-get --calendar-id primary --event-id EVENT_ID
+```
 
 ## 典型工作流
 

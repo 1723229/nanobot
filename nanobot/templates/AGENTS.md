@@ -24,7 +24,7 @@ When the user asks for a recurring/periodic task, update `HEARTBEAT.md` instead 
 
 When a user's request matches a specific skill domain, ALWAYS read the corresponding SKILL.md before attempting the task:
 
-- **飞书 / Feishu**: Any mention of 飞书, Feishu, Lark, 多维表格, 日报, 审批, 考勤, 日历, 日程, 知识库, 云文档 → read the matching feishu-* skill first
+- **飞书 / Feishu**: Any mention of 飞书, Feishu, Lark, 多维表格, 日报, 审批, 考勤, 日历, 日程, 云文档, 消息, 群组, 通讯录, 任务 → read the matching feishu-* skill first
 - **创建/编辑/优化技能**: Any request to create, modify, improve, or test a skill → read skill-creator SKILL.md first
 
 Do not attempt these tasks from memory alone — the skills contain specific scripts, APIs, and parameters that change over time.

@@ -1,6 +1,6 @@
 ---
 name: feishu-doc
-description: 飞书云文档 — 文件列表、读取文档内容、搜索文档。当用户提及云文档、飞书文档、读文档、文档内容、docx、doc时，务必先读取此技能。
+description: 飞书云文档 — 创建文档、读取文档内容、添加内容块、搜索文档、删除文档。当用户提及云文档、飞书文档、创建文档、读文档、写文档、文档内容、docx、doc时，务必先读取此技能。
 metadata:
   requires:
     - type: binary
@@ -9,7 +9,7 @@ metadata:
 
 # 飞书云文档 (Doc)
 
-飞书云文档 API，列出、读取、搜索云文档内容。
+飞书云文档 API，支持创建、读取、搜索、删除云文档，以及向文档中添加内容块。
 
 ## 使用流程
 
@@ -29,12 +29,51 @@ python3 scripts/feishu_doc.py list --parent-node fldcnXXX
 
 返回: [{name, token, type, url, ...}]，type: "docx" / "sheet" / "bitable" / "folder" / "mindnote"
 
+### get_doc
+
+获取文档元信息（标题、创建时间、修订版本等）。
+
+```
+python3 scripts/feishu_doc.py get --document-id doxcnXXX
+```
+
+返回: {document_id, title, revision_id, ...}
+
 ### read_doc
 
 读取云文档内容，返回 Markdown 格式纯文本。
 
 ```
 python3 scripts/feishu_doc.py read --document-id doxcnXXX
+```
+
+### create_doc
+
+创建新的云文档。可选指定目标文件夹和初始文本内容。
+
+```
+python3 scripts/feishu_doc.py create --title "会议纪要"
+python3 scripts/feishu_doc.py create --title "会议纪要" --folder-token fldcnXXX
+python3 scripts/feishu_doc.py create --title "会议纪要" --content "第一段内容\n第二段内容"
+```
+
+返回: {document_id, revision_id, title, url}
+
+### create_text_blocks
+
+在文档中添加文本段落。
+
+```
+python3 scripts/feishu_doc.py create-block --document-id doxcnXXX --texts '["第一段","第二段"]'
+python3 scripts/feishu_doc.py create-block --document-id doxcnXXX --block-id blkXXX --texts '["子块内容"]'
+```
+
+### delete_doc
+
+删除云文档（移至回收站）。
+
+```
+python3 scripts/feishu_doc.py delete --document-id doxcnXXX
 ```
 
 ### search_docs
@@ -60,22 +99,23 @@ python3 scripts/feishu_doc.py search --keyword "季度报告" --limit 10
 
 ```
 https://xxx.feishu.cn/docx/{doc_token}     → 新版文档
-https://xxx.feishu.cn/wiki/{node_token}     → 知识库页面（需先 wiki_get_node 获取 obj_token）
 ```
 
 ## 常见错误
 
 | 错误 | 正确做法 |
 |------|----------|
-| 用 wiki URL 中的 token 直接调用 doc API | 必须先 `wiki_get_node()` 获取 `obj_token`，再用 `obj_token` 调用 |
 | 并发写入同一文档 | 飞书文档不支持并发写入，需串行操作 |
 | 应用无法访问已有文档 | 需将应用添加为文档协作者 |
+| 创建文档报权限错误 | 需在飞书开放平台开通 `docx:document` 或 `docx:document:create` 权限 |
 
 ## 所需权限
 
 - `drive:drive:readonly` — 查看云空间文件
+- `drive:drive` — 管理云空间文件（删除）
 - `docx:document:readonly` — 查看文档内容
-- `docx:document` — 读写文档
+- `docx:document` — 读写文档（读取 + 添加内容块）
+- `docx:document:create` — 创建文档（仅创建也可用此权限）
 - `docs:doc:search` — 搜索文档
 
 ## 凭据

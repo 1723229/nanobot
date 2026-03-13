@@ -326,6 +326,40 @@ def bitable_batch_add_records(
     )
 
 
+def bitable_batch_update_records(
+    app_token: str,
+    table_id: str,
+    records: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """批量更新记录（单次最多 500 条）
+
+    Args:
+        records: [{"record_id": "recXXX", "fields": {"字段名": "值"}}, ...]
+    """
+    payload = {"records": records[:500]}
+    return _post(
+        f"/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_update",
+        payload, action="批量更新记录",
+    )
+
+
+def bitable_batch_delete_records(
+    app_token: str,
+    table_id: str,
+    record_ids: List[str],
+) -> Dict[str, Any]:
+    """批量删除记录（单次最多 500 条）
+
+    Args:
+        record_ids: ["recXXX", "recYYY", ...]
+    """
+    payload = {"records": record_ids[:500]}
+    return _post(
+        f"/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_delete",
+        payload, action="批量删除记录",
+    )
+
+
 # ============================================================
 # 便捷函数（业务场景）
 # ============================================================
@@ -464,6 +498,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--records", required=True, help="记录数组 JSON")
     p.add_argument("--smart", action="store_true", help="启用智能字段转换")
     
+    p = sub.add_parser("batch-update", help="批量更新记录")
+    p.add_argument("--app-token", required=True)
+    p.add_argument("--table-id", required=True)
+    p.add_argument("--records", required=True, help='JSON: [{"record_id":"recXXX","fields":{...}}, ...]')
+
+    p = sub.add_parser("batch-delete", help="批量删除记录")
+    p.add_argument("--app-token", required=True)
+    p.add_argument("--table-id", required=True)
+    p.add_argument("--record-ids", required=True, help='JSON: ["recXXX","recYYY"]')
+
     p = sub.add_parser("daily-add", help="录入日报")
     p.add_argument("--user-id", required=True)
     p.add_argument("--date", required=True)
@@ -515,6 +559,12 @@ def _run_cli(args: argparse.Namespace) -> None:
     elif act == "batch-add":
         _pp(bitable_batch_add_records(args.app_token, args.table_id,
                                       json.loads(args.records), smart=args.smart))
+    elif act == "batch-update":
+        _pp(bitable_batch_update_records(args.app_token, args.table_id,
+                                         json.loads(args.records)))
+    elif act == "batch-delete":
+        _pp(bitable_batch_delete_records(args.app_token, args.table_id,
+                                         json.loads(args.record_ids)))
     elif act == "daily-add":
         _pp(bitable_add_daily_report(args.user_id, args.date, args.project,
                                      args.content, args.hours))
