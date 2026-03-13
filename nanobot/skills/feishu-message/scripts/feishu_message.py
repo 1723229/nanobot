@@ -140,6 +140,109 @@ def get_message(message_id: str) -> Dict[str, Any]:
     return _get(f"/im/v1/messages/{message_id}", action="获取消息")
 
 
+def upload_image(image_path: str, image_type: str = "message") -> str:
+    """上传图片，返回 image_key
+
+    Args:
+        image_path: 本地图片路径
+        image_type: message | avatar
+    """
+    with open(image_path, "rb") as f:
+        resp = requests.post(
+            f"{BASE_URL}/im/v1/images",
+            headers={"Authorization": f"Bearer {get_tenant_access_token()}"},
+            data={"image_type": image_type},
+            files={"image": (os.path.basename(image_path), f)},
+            timeout=30,
+        )
+    data = _check(resp.json(), "上传图片")
+    return data.get("image_key", "")
+
+
+def upload_file(file_path: str, file_type: str = "stream") -> str:
+    """上传文件，返回 file_key
+
+    Args:
+        file_path: 本地文件路径
+        file_type: opus | mp4 | pdf | doc | xls | ppt | stream
+    """
+    name = os.path.basename(file_path)
+    with open(file_path, "rb") as f:
+        resp = requests.post(
+            f"{BASE_URL}/im/v1/files",
+            headers={"Authorization": f"Bearer {get_tenant_access_token()}"},
+            data={"file_type": file_type, "file_name": name},
+            files={"file": (name, f)},
+            timeout=60,
+        )
+    data = _check(resp.json(), "上传文件")
+    return data.get("file_key", "")
+
+
+def send_image(receive_id: str, image_key: str, receive_id_type: str = "chat_id") -> Dict[str, Any]:
+    """发送图片消息"""
+    return send_message(receive_id, "image", json.dumps({"image_key": image_key}), receive_id_type)
+
+
+def send_file(receive_id: str, file_key: str, receive_id_type: str = "chat_id") -> Dict[str, Any]:
+    """发送文件消息"""
+    return send_message(receive_id, "file", json.dumps({"file_key": file_key}), receive_id_type)
+
+
+def send_card(
+    receive_id: str,
+    card_json: str,
+    receive_id_type: str = "chat_id",
+) -> Dict[str, Any]:
+    """发送消息卡片 (interactive card)
+
+    Args:
+        card_json: 卡片 JSON 字符串（飞书卡片搭建器导出格式）
+    """
+    return send_message(receive_id, "interactive", card_json, receive_id_type)
+
+
+def recall_message(message_id: str) -> Dict[str, Any]:
+    """撤回消息"""
+    resp = requests.delete(
+        f"{BASE_URL}/im/v1/messages/{message_id}",
+        headers=_headers(), timeout=10,
+    )
+    return _check(resp.json(), "撤回消息")
+
+
+def forward_message(
+    message_id: str,
+    receive_id: str,
+    receive_id_type: str = "chat_id",
+) -> Dict[str, Any]:
+    """转发消息"""
+    return _post(
+        f"/im/v1/messages/{message_id}/forward",
+        {"receive_id": receive_id},
+        params={"receive_id_type": receive_id_type},
+        action="转发消息",
+    )
+
+
+def add_reaction(message_id: str, emoji_type: str) -> Dict[str, Any]:
+    """添加表情回复
+
+    Args:
+        emoji_type: 表情类型，如 SMILE, THUMBSUP, HEART, CLAP 等
+    """
+    return _post(
+        f"/im/v1/messages/{message_id}/reactions",
+        {"reaction_type": {"emoji_type": emoji_type}},
+        action="添加表情回复",
+    )
+
+
+def list_reactions(message_id: str) -> Dict[str, Any]:
+    """获取消息的表情回复列表"""
+    return _get(f"/im/v1/messages/{message_id}/reactions", action="获取表情回复")
+
+
 # ============================================================
 # CLI
 # ============================================================
@@ -147,17 +250,52 @@ def get_message(message_id: str) -> Dict[str, Any]:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_message", description="飞书消息收发")
     sub = parser.add_subparsers(dest="action")
+
     p = sub.add_parser("history", help="会话历史")
     p.add_argument("--chat-id", required=True)
     p.add_argument("--start-time", default="")
     p.add_argument("--end-time", default="")
     p.add_argument("--limit", type=int, default=20)
+
     p = sub.add_parser("send", help="发送文本")
     p.add_argument("--receive-id", required=True)
     p.add_argument("--text", required=True)
     p.add_argument("--id-type", default="chat_id")
+
+    p = sub.add_parser("send-card", help="发送消息卡片")
+    p.add_argument("--receive-id", required=True)
+    p.add_argument("--card-json", required=True, help="卡片 JSON 字符串或 @file.json 从文件读取")
+    p.add_argument("--id-type", default="chat_id")
+
+    p = sub.add_parser("send-image", help="上传并发送图片")
+    p.add_argument("--receive-id", required=True)
+    p.add_argument("--file", required=True, help="本地图片路径")
+    p.add_argument("--id-type", default="chat_id")
+
+    p = sub.add_parser("send-file", help="上传并发送文件")
+    p.add_argument("--receive-id", required=True)
+    p.add_argument("--file", required=True, help="本地文件路径")
+    p.add_argument("--file-type", default="stream", help="opus|mp4|pdf|doc|xls|ppt|stream")
+    p.add_argument("--id-type", default="chat_id")
+
     p = sub.add_parser("get", help="获取单条消息")
     p.add_argument("--message-id", required=True)
+
+    p = sub.add_parser("recall", help="撤回消息")
+    p.add_argument("--message-id", required=True)
+
+    p = sub.add_parser("forward", help="转发消息")
+    p.add_argument("--message-id", required=True)
+    p.add_argument("--receive-id", required=True)
+    p.add_argument("--id-type", default="chat_id")
+
+    p = sub.add_parser("react", help="添加表情回复")
+    p.add_argument("--message-id", required=True)
+    p.add_argument("--emoji", required=True, help="SMILE|THUMBSUP|HEART|CLAP|...")
+
+    p = sub.add_parser("reactions", help="获取表情回复列表")
+    p.add_argument("--message-id", required=True)
+
     return parser
 
 
@@ -167,8 +305,30 @@ def _run_cli(args: argparse.Namespace) -> None:
         _pp(get_chat_history(args.chat_id, args.start_time, args.end_time, args.limit))
     elif act == "send":
         _pp(send_text(args.receive_id, args.text, args.id_type))
+    elif act == "send-card":
+        card = args.card_json
+        if card.startswith("@"):
+            with open(card[1:], "r", encoding="utf-8") as f:
+                card = f.read()
+        _pp(send_card(args.receive_id, card, args.id_type))
+    elif act == "send-image":
+        key = upload_image(args.file)
+        print(f"image_key: {key}")
+        _pp(send_image(args.receive_id, key, args.id_type))
+    elif act == "send-file":
+        key = upload_file(args.file, args.file_type)
+        print(f"file_key: {key}")
+        _pp(send_file(args.receive_id, key, args.id_type))
     elif act == "get":
         _pp(get_message(args.message_id))
+    elif act == "recall":
+        _pp(recall_message(args.message_id))
+    elif act == "forward":
+        _pp(forward_message(args.message_id, args.receive_id, args.id_type))
+    elif act == "react":
+        _pp(add_reaction(args.message_id, args.emoji))
+    elif act == "reactions":
+        _pp(list_reactions(args.message_id))
 
 
 def main() -> int:

@@ -89,6 +89,51 @@ def _pp(data: Any) -> None:
 # 云空间 / 文件管理 (drive/v1)
 # ============================================================
 
+def drive_list_files(
+    folder_token: str = "",
+    page_size: int = 50,
+    page_token: str = "",
+    order_by: str = "EditedTime",
+    direction: str = "DESC",
+) -> Dict[str, Any]:
+    """列出文件夹中的文件和子文件夹
+
+    Args:
+        folder_token: 文件夹 token，空字符串表示根目录
+        page_size: 每页数量（最大 200）
+        order_by: 排序字段 EditedTime | CreatedTime
+        direction: ASC | DESC
+    """
+    params: Dict[str, Any] = {
+        "page_size": min(page_size, 200),
+        "order_by": order_by,
+        "direction": direction,
+    }
+    if folder_token:
+        params["folder_token"] = folder_token
+    if page_token:
+        params["page_token"] = page_token
+    return _get("/drive/v1/files", params, action="列出文件")
+
+
+def drive_search(
+    search_key: str,
+    count: int = 20,
+    docs_types: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """搜索云文档
+
+    Args:
+        search_key: 搜索关键词
+        count: 返回数量（最大 50）
+        docs_types: 过滤文档类型列表，如 ["doc","sheet","bitable","folder"]
+    """
+    payload: Dict[str, Any] = {"search_key": search_key, "count": min(count, 50)}
+    if docs_types:
+        payload["docs_types"] = docs_types
+    return _post("/suite/docs-api/search/object", payload, action="搜索云文档")
+
+
 def drive_create_folder(
     name: str,
     folder_token: str = "",
@@ -169,21 +214,39 @@ def drive_add_permission(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_drive", description="飞书云空间/文件管理")
     sub = parser.add_subparsers(dest="action")
+
+    p = sub.add_parser("list", help="列出文件夹内容")
+    p.add_argument("--folder-token", default="", help="文件夹 token，空=根目录")
+    p.add_argument("--limit", type=int, default=50)
+
+    p = sub.add_parser("search", help="搜索云文档")
+    p.add_argument("--keyword", required=True)
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--types", default="", help="文档类型过滤，逗号分隔: doc,sheet,bitable,folder")
+
     p = sub.add_parser("mkdir", help="创建文件夹")
     p.add_argument("--name", required=True)
     p.add_argument("--folder-token", default="")
+
     p = sub.add_parser("upload", help="上传文件")
     p.add_argument("--file", required=True)
     p.add_argument("--parent-node", required=True)
+
     p = sub.add_parser("download", help="下载文件")
     p.add_argument("--file-token", required=True)
     p.add_argument("--save-path", required=True)
+
     return parser
 
 
 def _run_cli(args: argparse.Namespace) -> None:
     act = args.action
-    if act == "mkdir":
+    if act == "list":
+        _pp(drive_list_files(args.folder_token, args.limit))
+    elif act == "search":
+        types = [t.strip() for t in args.types.split(",") if t.strip()] if args.types else None
+        _pp(drive_search(args.keyword, args.limit, types))
+    elif act == "mkdir":
         _pp(drive_create_folder(args.name, args.folder_token))
     elif act == "upload":
         _pp(drive_upload_file(args.file, args.parent_node))

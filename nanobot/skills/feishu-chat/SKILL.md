@@ -1,6 +1,6 @@
 ---
 name: feishu-chat
-description: 飞书群组管理 — 列出群组、获取群信息、获取群成员列表
+description: 飞书群组管理 — 群 CRUD、成员管理、群信息维护
 metadata:
   requires:
     - type: binary
@@ -9,7 +9,7 @@ metadata:
 
 # 飞书群组管理 (Chat)
 
-飞书 IM 群组相关 API，管理机器人所在的群、获取群信息和群成员。
+飞书 IM 群组相关 API，创建/管理群、获取群信息和成员、邀请/移出成员。
 
 ## 使用流程
 
@@ -26,8 +26,6 @@ metadata:
 python3 scripts/feishu_chat.py list --limit 20
 ```
 
-返回: `items` -> [{chat_id, name, description, owner_id, ...}], `has_more`, `page_token`
-
 ### get_chat
 
 获取群详细信息。
@@ -35,8 +33,6 @@ python3 scripts/feishu_chat.py list --limit 20
 ```
 python3 scripts/feishu_chat.py info --chat-id oc_xxx
 ```
-
-返回: {chat_id, name, description, owner_id, chat_mode, chat_type, ...}
 
 ### get_chat_members
 
@@ -46,8 +42,6 @@ python3 scripts/feishu_chat.py info --chat-id oc_xxx
 python3 scripts/feishu_chat.py members --chat-id oc_xxx --limit 50
 ```
 
-返回: `items` -> [{member_id, name, tenant_key}], `has_more`
-
 ### get_chat_members_all
 
 获取群全部成员（自动分页）。
@@ -56,7 +50,48 @@ python3 scripts/feishu_chat.py members --chat-id oc_xxx --limit 50
 python3 scripts/feishu_chat.py members --chat-id oc_xxx --all
 ```
 
-返回: [{member_id, name, tenant_key}, ...]
+### create_chat
+
+创建群。
+
+```
+python3 scripts/feishu_chat.py create --name "测试群" --description "群描述"
+python3 scripts/feishu_chat.py create --name "项目群" --user-ids ou_xxx,ou_yyy --owner-id ou_xxx
+```
+
+`--chat-type` 可选值: private（私有群，默认） / public（公开群）
+
+### update_chat
+
+更新群信息。
+
+```
+python3 scripts/feishu_chat.py update --chat-id oc_xxx --name "新群名" --description "新描述"
+```
+
+### add_members
+
+邀请用户进群。
+
+```
+python3 scripts/feishu_chat.py add-members --chat-id oc_xxx --user-ids ou_xxx,ou_yyy
+```
+
+### remove_members
+
+将用户移出群。
+
+```
+python3 scripts/feishu_chat.py remove-members --chat-id oc_xxx --user-ids ou_xxx
+```
+
+### disband_chat
+
+解散群。
+
+```
+python3 scripts/feishu_chat.py disband --chat-id oc_xxx
+```
 
 ## ID 前缀对应关系
 
@@ -70,6 +105,8 @@ python3 scripts/feishu_chat.py members --chat-id oc_xxx --all
 
 - `im:chat:readonly` — 获取群组信息
 - `im:chat.member:read` — 获取群成员
+- `im:chat` — 创建/更新/解散群
+- `im:chat.member` — 邀请/移出成员
 
 ## 凭据
 

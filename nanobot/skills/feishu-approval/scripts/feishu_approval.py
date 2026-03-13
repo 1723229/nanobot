@@ -225,10 +225,16 @@ def approval_transfer_task(
                  params={"user_id_type": "open_id"}, action="审批转交")
 
 
-def approval_list_comments(instance_id: str, page_size: int = 50) -> Dict[str, Any]:
-    """获取审批实例评论"""
+def approval_list_comments(
+    instance_id: str,
+    user_id: str,
+    user_id_type: str = "open_id",
+    page_size: int = 50,
+) -> Dict[str, Any]:
+    """获取审批实例评论（需指定查询用户）"""
     return _get(f"/approval/v4/instances/{instance_id}/comments",
-                {"page_size": page_size}, action="获取审批评论")
+                {"user_id": user_id, "user_id_type": user_id_type, "page_size": page_size},
+                action="获取审批评论")
 
 
 def create_leave_approval(
@@ -268,17 +274,53 @@ def create_leave_approval(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_approval", description="飞书审批")
     sub = parser.add_subparsers(dest="action")
+
     p = sub.add_parser("definition", help="获取审批定义")
     p.add_argument("--code", required=True)
+
     p = sub.add_parser("list", help="列出实例")
     p.add_argument("--code", required=True)
     p.add_argument("--limit", type=int, default=20)
+
     p = sub.add_parser("get", help="获取实例详情")
     p.add_argument("--instance-code", required=True)
+
+    p = sub.add_parser("comments", help="获取实例评论")
+    p.add_argument("--instance-code", required=True)
+    p.add_argument("--user-id", required=True, help="查询用户 open_id")
+
     p = sub.add_parser("create", help="创建实例")
     p.add_argument("--code", required=True)
     p.add_argument("--user-id", required=True)
     p.add_argument("--form", required=True, help="表单 JSON")
+
+    p = sub.add_parser("cancel", help="撤回实例")
+    p.add_argument("--code", required=True)
+    p.add_argument("--instance-code", required=True)
+    p.add_argument("--user-id", required=True)
+
+    p = sub.add_parser("approve", help="审批同意")
+    p.add_argument("--code", required=True)
+    p.add_argument("--instance-code", required=True)
+    p.add_argument("--user-id", required=True)
+    p.add_argument("--task-id", required=True)
+    p.add_argument("--comment", default="")
+
+    p = sub.add_parser("reject", help="审批拒绝")
+    p.add_argument("--code", required=True)
+    p.add_argument("--instance-code", required=True)
+    p.add_argument("--user-id", required=True)
+    p.add_argument("--task-id", required=True)
+    p.add_argument("--comment", default="")
+
+    p = sub.add_parser("transfer", help="审批转交")
+    p.add_argument("--code", required=True)
+    p.add_argument("--instance-code", required=True)
+    p.add_argument("--user-id", required=True)
+    p.add_argument("--task-id", required=True)
+    p.add_argument("--target-user-id", required=True)
+    p.add_argument("--comment", default="")
+
     return parser
 
 
@@ -290,8 +332,21 @@ def _run_cli(args: argparse.Namespace) -> None:
         _pp(approval_list_instances(args.code, page_size=args.limit))
     elif act == "get":
         _pp(approval_get_instance(args.instance_code))
+    elif act == "comments":
+        _pp(approval_list_comments(args.instance_code, args.user_id))
     elif act == "create":
         _pp(approval_create_instance(args.code, args.user_id, args.form))
+    elif act == "cancel":
+        _pp(approval_cancel_instance(args.code, args.instance_code, args.user_id))
+    elif act == "approve":
+        _pp(approval_approve_task(args.code, args.instance_code, args.user_id,
+                                  args.task_id, args.comment))
+    elif act == "reject":
+        _pp(approval_reject_task(args.code, args.instance_code, args.user_id,
+                                 args.task_id, args.comment))
+    elif act == "transfer":
+        _pp(approval_transfer_task(args.code, args.instance_code, args.user_id,
+                                   args.task_id, args.target_user_id, args.comment))
 
 
 def main() -> int:

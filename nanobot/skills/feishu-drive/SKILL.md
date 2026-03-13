@@ -1,6 +1,6 @@
 ---
 name: feishu-drive
-description: 飞书云空间/文件管理 — 文件夹创建、上传/下载、权限管理
+description: 飞书云空间/文件管理 — 文件列表、搜索、文件夹创建、上传/下载、权限管理
 metadata:
   requires:
     - type: binary
@@ -9,7 +9,7 @@ metadata:
 
 # 飞书云空间/文件管理 (Drive)
 
-飞书云空间 API，管理文件夹、上传下载文件和文档权限。
+飞书云空间 API，浏览文件列表、搜索文档、管理文件夹、上传下载文件和文档权限。
 
 ## 使用流程
 
@@ -17,6 +17,28 @@ metadata:
 2. 通过 `exec` 工具调用脚本执行
 
 ## API 函数
+
+### drive_list_files
+
+列出文件夹中的文件和子文件夹。
+
+```
+python3 scripts/feishu_drive.py list
+python3 scripts/feishu_drive.py list --folder-token fldcnXXX --limit 50
+```
+
+不传 `--folder-token` 则列出根目录。
+
+### drive_search
+
+搜索云文档。
+
+```
+python3 scripts/feishu_drive.py search --keyword "季度报告" --limit 10
+python3 scripts/feishu_drive.py search --keyword "项目" --types doc,sheet
+```
+
+`--types` 可选: doc / sheet / bitable / folder
 
 ### drive_create_folder
 

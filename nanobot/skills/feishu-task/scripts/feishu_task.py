@@ -181,15 +181,35 @@ def tasklist_add_task(task_id: str, tasklist_id: str) -> Dict[str, Any]:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_task", description="飞书任务管理")
     sub = parser.add_subparsers(dest="action")
+
     p = sub.add_parser("list", help="列出任务")
     p.add_argument("--limit", type=int, default=50)
+
     p = sub.add_parser("get", help="获取任务")
     p.add_argument("--task-id", required=True)
+
     p = sub.add_parser("create", help="创建任务")
     p.add_argument("--summary", required=True)
     p.add_argument("--description", default="")
+
+    p = sub.add_parser("update", help="更新任务")
+    p.add_argument("--task-id", required=True)
+    p.add_argument("--summary", default="", help="新标题")
+    p.add_argument("--description", default="", help="新描述")
+
     p = sub.add_parser("complete", help="完成任务")
     p.add_argument("--task-id", required=True)
+
+    p = sub.add_parser("tasklist-create", help="创建任务清单")
+    p.add_argument("--name", required=True)
+
+    p = sub.add_parser("tasklist-list", help="列出任务清单")
+    p.add_argument("--limit", type=int, default=50)
+
+    p = sub.add_parser("tasklist-add", help="将任务添加到清单")
+    p.add_argument("--task-id", required=True)
+    p.add_argument("--tasklist-id", required=True)
+
     return parser
 
 
@@ -201,8 +221,24 @@ def _run_cli(args: argparse.Namespace) -> None:
         _pp(task_get(args.task_id))
     elif act == "create":
         _pp(task_create(args.summary, args.description))
+    elif act == "update":
+        fields = {}
+        if args.summary:
+            fields["summary"] = args.summary
+        if args.description:
+            fields["description"] = args.description
+        if not fields:
+            print("错误: 至少提供 --summary 或 --description", file=sys.stderr)
+            return
+        _pp(task_update(args.task_id, fields))
     elif act == "complete":
         _pp(task_complete(args.task_id))
+    elif act == "tasklist-create":
+        _pp(tasklist_create(args.name))
+    elif act == "tasklist-list":
+        _pp(tasklist_list(args.limit))
+    elif act == "tasklist-add":
+        _pp(tasklist_add_task(args.task_id, args.tasklist_id))
 
 
 def main() -> int:

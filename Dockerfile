@@ -31,7 +31,11 @@ RUN npm install && npm run build
 WORKDIR /app
 
 # Install agent-browser for browser automation
-RUN npm install -g agent-browser && \
+# Include CJK fonts so headless Chromium renders Chinese text correctly
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fonts-noto-cjk && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm install -g agent-browser && \
     agent-browser install --with-deps
 
 # Create config directory

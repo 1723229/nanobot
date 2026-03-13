@@ -139,14 +139,15 @@ def wiki_create_node(
 
 def wiki_search(
     keyword: str,
-    space_id: str = "",
-    page_size: int = 20,
+    count: int = 20,
 ) -> Dict[str, Any]:
-    """搜索知识库"""
-    payload: Dict[str, Any] = {"query": keyword, "page_size": page_size}
-    if space_id:
-        payload["space_id"] = space_id
-    return _post("/wiki/v1/nodes/search", payload, action="搜索知识库")
+    """搜索知识库（通过通用文档搜索 API，使用 tenant_access_token）"""
+    payload: Dict[str, Any] = {
+        "search_key": keyword,
+        "count": min(count, 50),
+        "docs_types": ["wiki"],
+    }
+    return _post("/suite/docs-api/search/object", payload, action="搜索知识库")
 
 
 # ============================================================
@@ -162,7 +163,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--parent-node", default="")
     p = sub.add_parser("search", help="搜索知识库")
     p.add_argument("--keyword", required=True)
-    p.add_argument("--space-id", default="")
+    p.add_argument("--limit", type=int, default=20)
     return parser
 
 
@@ -173,7 +174,7 @@ def _run_cli(args: argparse.Namespace) -> None:
     elif act == "nodes":
         _pp(wiki_list_nodes(args.space_id, args.parent_node))
     elif act == "search":
-        _pp(wiki_search(args.keyword, args.space_id))
+        _pp(wiki_search(args.keyword, args.limit))
 
 
 def main() -> int:

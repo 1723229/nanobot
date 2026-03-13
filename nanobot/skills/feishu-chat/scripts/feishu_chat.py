@@ -128,6 +128,109 @@ def get_chat_members_all(chat_id: str, member_id_type: str = "open_id") -> List[
     return members
 
 
+def _put(path: str, payload: Optional[dict] = None, *, params: Optional[dict] = None,
+         timeout: int = 10, action: str = "") -> dict:
+    resp = requests.put(f"{BASE_URL}{path}", headers=_headers(), json=payload,
+                        params=params, timeout=timeout)
+    return _check(resp.json(), action or path)
+
+
+def _delete_with_body(path: str, payload: Optional[dict] = None, *,
+                      timeout: int = 10, action: str = "") -> dict:
+    resp = requests.delete(f"{BASE_URL}{path}", headers=_headers(), json=payload, timeout=timeout)
+    return _check(resp.json(), action or path)
+
+
+def create_chat(
+    name: str = "",
+    description: str = "",
+    owner_id: str = "",
+    user_id_list: Optional[List[str]] = None,
+    chat_mode: str = "group",
+    chat_type: str = "private",
+) -> Dict[str, Any]:
+    """创建群
+
+    Args:
+        name: 群名称
+        description: 群描述
+        owner_id: 群主 open_id（空则为机器人）
+        user_id_list: 初始成员 open_id 列表
+        chat_mode: group
+        chat_type: private | public
+    """
+    payload: Dict[str, Any] = {"chat_mode": chat_mode, "chat_type": chat_type}
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+    if owner_id:
+        payload["owner_id"] = owner_id
+    if user_id_list:
+        payload["user_id_list"] = user_id_list
+    return _post("/im/v1/chats", payload, action="创建群")
+
+
+def update_chat(
+    chat_id: str,
+    name: str = "",
+    description: str = "",
+) -> Dict[str, Any]:
+    """更新群信息"""
+    payload: Dict[str, Any] = {}
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+    if not payload:
+        raise ValueError("至少提供 name 或 description")
+    return _put(f"/im/v1/chats/{chat_id}", payload, action="更新群信息")
+
+
+def add_members(
+    chat_id: str,
+    id_list: List[str],
+    member_id_type: str = "open_id",
+) -> Dict[str, Any]:
+    """邀请用户进群
+
+    Args:
+        id_list: 用户 ID 列表（最多 50）
+    """
+    return _post(
+        f"/im/v1/chats/{chat_id}/members",
+        {"id_list": id_list[:50]},
+        params={"member_id_type": member_id_type},
+        action="邀请进群",
+    )
+
+
+def remove_members(
+    chat_id: str,
+    id_list: List[str],
+    member_id_type: str = "open_id",
+) -> Dict[str, Any]:
+    """将用户移出群
+
+    Args:
+        id_list: 用户 ID 列表
+    """
+    return _delete_with_body(
+        f"/im/v1/chats/{chat_id}/members",
+        {"id_list": id_list},
+        action="移出群",
+    )
+
+
+def disband_chat(chat_id: str) -> Dict[str, Any]:
+    """解散群"""
+    resp = requests.delete(
+        f"{BASE_URL}/im/v1/chats/{chat_id}",
+        headers=_headers(), timeout=10,
+    )
+    return _check(resp.json(), "解散群")
+
+
 # ============================================================
 # CLI
 # ============================================================
@@ -135,14 +238,41 @@ def get_chat_members_all(chat_id: str, member_id_type: str = "open_id") -> List[
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_chat", description="飞书群组管理")
     sub = parser.add_subparsers(dest="action")
+
     p = sub.add_parser("list", help="列出群组")
     p.add_argument("--limit", type=int, default=20)
+
     p = sub.add_parser("info", help="获取群信息")
     p.add_argument("--chat-id", required=True)
+
     p = sub.add_parser("members", help="获取群成员")
     p.add_argument("--chat-id", required=True)
     p.add_argument("--all", action="store_true")
     p.add_argument("--limit", type=int, default=100)
+
+    p = sub.add_parser("create", help="创建群")
+    p.add_argument("--name", default="")
+    p.add_argument("--description", default="")
+    p.add_argument("--owner-id", default="", help="群主 open_id")
+    p.add_argument("--user-ids", default="", help="初始成员 open_id，逗号分隔")
+    p.add_argument("--chat-type", default="private", help="private|public")
+
+    p = sub.add_parser("update", help="更新群信息")
+    p.add_argument("--chat-id", required=True)
+    p.add_argument("--name", default="")
+    p.add_argument("--description", default="")
+
+    p = sub.add_parser("add-members", help="邀请进群")
+    p.add_argument("--chat-id", required=True)
+    p.add_argument("--user-ids", required=True, help="open_id，逗号分隔")
+
+    p = sub.add_parser("remove-members", help="移出群")
+    p.add_argument("--chat-id", required=True)
+    p.add_argument("--user-ids", required=True, help="open_id，逗号分隔")
+
+    p = sub.add_parser("disband", help="解散群")
+    p.add_argument("--chat-id", required=True)
+
     return parser
 
 
@@ -157,6 +287,19 @@ def _run_cli(args: argparse.Namespace) -> None:
             _pp(get_chat_members_all(args.chat_id))
         else:
             _pp(get_chat_members(args.chat_id, page_size=args.limit))
+    elif act == "create":
+        user_ids = [u.strip() for u in args.user_ids.split(",") if u.strip()] if args.user_ids else None
+        _pp(create_chat(args.name, args.description, args.owner_id, user_ids, chat_type=args.chat_type))
+    elif act == "update":
+        _pp(update_chat(args.chat_id, args.name, args.description))
+    elif act == "add-members":
+        ids = [u.strip() for u in args.user_ids.split(",") if u.strip()]
+        _pp(add_members(args.chat_id, ids))
+    elif act == "remove-members":
+        ids = [u.strip() for u in args.user_ids.split(",") if u.strip()]
+        _pp(remove_members(args.chat_id, ids))
+    elif act == "disband":
+        _pp(disband_chat(args.chat_id))
 
 
 def main() -> int:

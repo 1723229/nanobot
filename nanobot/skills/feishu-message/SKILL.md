@@ -1,6 +1,6 @@
 ---
 name: feishu-message
-description: 飞书消息收发 — 发送/回复/获取消息、会话历史
+description: 飞书消息收发 — 发送/回复/撤回/转发消息、图片文件上传、消息卡片、表情回复
 metadata:
   requires:
     - type: binary
@@ -9,7 +9,7 @@ metadata:
 
 # 飞书消息收发 (Message)
 
-飞书消息 API，支持发送、回复、获取单条消息和会话历史。
+飞书消息 API，支持发送文本/图片/文件/卡片消息、回复、撤回、转发、表情回复和会话历史。
 
 ## 使用流程
 
@@ -27,6 +27,35 @@ python3 scripts/feishu_message.py send --receive-id oc_xxx --text "你好" --id-
 ```
 
 `--id-type` 可选值: chat_id / open_id / union_id / email
+
+### send-image
+
+上传本地图片并发送图片消息。
+
+```
+python3 scripts/feishu_message.py send-image --receive-id oc_xxx --file /path/to/image.png
+```
+
+### send-file
+
+上传本地文件并发送文件消息。
+
+```
+python3 scripts/feishu_message.py send-file --receive-id oc_xxx --file /path/to/doc.pdf --file-type pdf
+```
+
+`--file-type` 可选值: opus / mp4 / pdf / doc / xls / ppt / stream
+
+### send-card
+
+发送消息卡片 (interactive card)。
+
+```
+python3 scripts/feishu_message.py send-card --receive-id oc_xxx --card-json '{"header":{"title":{"tag":"plain_text","content":"标题"}},"elements":[{"tag":"div","text":{"tag":"plain_text","content":"内容"}}]}'
+python3 scripts/feishu_message.py send-card --receive-id oc_xxx --card-json @card.json
+```
+
+`--card-json` 支持直接传 JSON 字符串，或以 `@` 前缀从文件读取。
 
 ### get_message
 
@@ -46,6 +75,40 @@ python3 scripts/feishu_message.py history --chat-id oc_xxx --start-time "1710000
 ```
 
 时间为秒级时间戳字符串。
+
+### recall
+
+撤回消息（仅限机器人自己发送的消息）。
+
+```
+python3 scripts/feishu_message.py recall --message-id om_xxx
+```
+
+### forward
+
+转发消息到其他会话。
+
+```
+python3 scripts/feishu_message.py forward --message-id om_xxx --receive-id oc_yyy
+```
+
+### react
+
+给消息添加表情回复。
+
+```
+python3 scripts/feishu_message.py react --message-id om_xxx --emoji THUMBSUP
+```
+
+常用表情: SMILE / THUMBSUP / HEART / CLAP / MUSCLE / JIAYI / OK
+
+### reactions
+
+获取消息的所有表情回复。
+
+```
+python3 scripts/feishu_message.py reactions --message-id om_xxx
+```
 
 ## 消息类型 msg_type
 
@@ -80,7 +143,10 @@ python3 scripts/feishu_message.py history --chat-id oc_xxx --start-time "1710000
 
 - `im:message:send_as_bot` — 发送消息
 - `im:message:readonly` — 获取消息
-- `im:message` — 完整消息权限
+- `im:message` — 完整消息权限（撤回、转发）
+- `im:resource` — 上传图片/文件
+- `im:message.reactions:readonly` — 获取表情回复
+- `im:message.reactions` — 添加表情回复
 
 ## 凭据
 

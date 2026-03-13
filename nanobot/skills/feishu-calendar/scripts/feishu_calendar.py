@@ -176,17 +176,26 @@ def calendar_delete_event(calendar_id: str, event_id: str) -> Dict[str, Any]:
                    action="删除日程")
 
 
+def _to_iso(ts: str) -> str:
+    """将秒级时间戳转为 ISO 8601，已是 ISO 格式则原样返回"""
+    if ts.isdigit():
+        from datetime import datetime, timezone, timedelta
+        dt = datetime.fromtimestamp(int(ts), tz=timezone(timedelta(hours=8)))
+        return dt.isoformat()
+    return ts
+
+
 def calendar_freebusy(
-    user_ids: List[str],
+    user_id: str,
     start_time: str,
     end_time: str,
     user_id_type: str = "open_id",
 ) -> Dict[str, Any]:
-    """查询忙闲信息"""
+    """查询忙闲信息（时间支持秒级时间戳或 ISO 8601）"""
     return _post("/calendar/v4/freebusy/list", {
-        "time_min": start_time,
-        "time_max": end_time,
-        "user_id": user_ids[0] if len(user_ids) == 1 else None,
+        "time_min": _to_iso(start_time),
+        "time_max": _to_iso(end_time),
+        "user_id": user_id,
     }, params={"user_id_type": user_id_type}, action="查询忙闲")
 
 
@@ -222,18 +231,47 @@ def meeting_reserve(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu_calendar", description="飞书日历与日程")
     sub = parser.add_subparsers(dest="action")
+
     p = sub.add_parser("list", help="列出日历")
+
+    p = sub.add_parser("get", help="获取日历信息")
+    p.add_argument("--calendar-id", required=True)
+
     p = sub.add_parser("events", help="列出日程")
-    p.add_argument("--calendar-id", default="primary")
+    p.add_argument("--calendar-id", required=True)
     p.add_argument("--start-time", default="")
     p.add_argument("--end-time", default="")
     p.add_argument("--limit", type=int, default=50)
-    p = sub.add_parser("create-event", help="创建日程")
-    p.add_argument("--calendar-id", default="primary")
+
+    p = sub.add_parser("event-get", help="获取日程详情")
+    p.add_argument("--calendar-id", required=True)
+    p.add_argument("--event-id", required=True)
+
+    p = sub.add_parser("event-create", help="创建日程")
+    p.add_argument("--calendar-id", required=True)
     p.add_argument("--summary", required=True)
     p.add_argument("--start-time", required=True)
     p.add_argument("--end-time", required=True)
     p.add_argument("--description", default="")
+
+    p = sub.add_parser("event-delete", help="删除日程")
+    p.add_argument("--calendar-id", required=True)
+    p.add_argument("--event-id", required=True)
+
+    p = sub.add_parser("freebusy", help="查询忙闲")
+    p.add_argument("--user-id", required=True, help="open_id")
+    p.add_argument("--start-time", required=True, help="秒级时间戳")
+    p.add_argument("--end-time", required=True, help="秒级时间戳")
+
+    p = sub.add_parser("rooms", help="搜索会议室")
+    p.add_argument("--query", default="", help="搜索关键词")
+    p.add_argument("--limit", type=int, default=20)
+
+    p = sub.add_parser("reserve", help="预约会议")
+    p.add_argument("--start-time", required=True)
+    p.add_argument("--end-time", required=True)
+    p.add_argument("--room-id", default="", help="会议室 ID")
+
     return parser
 
 
@@ -241,12 +279,24 @@ def _run_cli(args: argparse.Namespace) -> None:
     act = args.action
     if act == "list":
         _pp(calendar_list())
+    elif act == "get":
+        _pp(calendar_get(args.calendar_id))
     elif act == "events":
         _pp(calendar_list_events(args.calendar_id, args.start_time or None,
                                  args.end_time or None, args.limit))
-    elif act == "create-event":
+    elif act == "event-get":
+        _pp(calendar_get_event(args.calendar_id, args.event_id))
+    elif act == "event-create":
         _pp(calendar_create_event(args.calendar_id, args.summary,
                                   args.start_time, args.end_time, args.description))
+    elif act == "event-delete":
+        _pp(calendar_delete_event(args.calendar_id, args.event_id))
+    elif act == "freebusy":
+        _pp(calendar_freebusy(args.user_id, args.start_time, args.end_time))
+    elif act == "rooms":
+        _pp(meeting_room_search(args.query, args.limit))
+    elif act == "reserve":
+        _pp(meeting_reserve(args.start_time, args.end_time, args.room_id or None))
 
 
 def main() -> int:
