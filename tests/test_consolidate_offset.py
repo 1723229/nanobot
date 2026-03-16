@@ -551,7 +551,7 @@ class TestNewCommandArchival:
 
         archived_count = -1
 
-        async def _fake_consolidate(messages) -> bool:
+        async def _fake_consolidate(messages, **kwargs) -> bool:
             nonlocal archived_count
             archived_count = len(messages)
             return True
@@ -578,7 +578,7 @@ class TestNewCommandArchival:
             session.add_message("assistant", f"resp{i}")
         loop.sessions.save(session)
 
-        async def _ok_consolidate(_messages) -> bool:
+        async def _ok_consolidate(_messages, **kwargs) -> bool:
             return True
 
         loop.memory_consolidator.consolidate_messages = _ok_consolidate  # type: ignore[method-assign]
