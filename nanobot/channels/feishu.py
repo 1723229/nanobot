@@ -1152,9 +1152,9 @@ class FeishuChannel(BaseChannel):
                         )
                         if fp:
                             quote_media.append(fp)
-                        quote_text = "> [quoted image]\n"
+                        quote_text = "[Reply to: [quoted image]]\n"
                     elif p_type == "sticker":
-                        quote_text = "> [quoted sticker/emoji]\n"
+                        quote_text = "[Reply to: [quoted sticker/emoji]]\n"
                     elif p_type == "post":
                         text, img_keys = _extract_post_content(p_json)
                         for img_key in img_keys:
@@ -1165,17 +1165,11 @@ class FeishuChannel(BaseChannel):
                                 quote_media.append(fp)
                         raw = text or ""
                         if raw:
-                            quoted_lines = "\n".join(
-                                f"> {line}" for line in raw.splitlines()
-                            )
-                            quote_text = quoted_lines + "\n"
+                            quote_text = f"[Reply to: {raw.strip()}]\n"
                     else:
                         raw = self._extract_message_text(p_type, p_content_str)
                         if raw:
-                            quoted_lines = "\n".join(
-                                f"> {line}" for line in raw.splitlines()
-                            )
-                            quote_text = quoted_lines + "\n"
+                            quote_text = f"[Reply to: {raw.strip()}]\n"
 
                     # Replace mention placeholders in quoted text
                     if parent_mention_map and quote_text:
@@ -1233,15 +1227,6 @@ class FeishuChannel(BaseChannel):
             # Extract reply context (parent/root message IDs)
             parent_id = getattr(message, "parent_id", None) or None
             root_id = getattr(message, "root_id", None) or None
-
-            # Prepend quoted message text when the user replied to another message
-            if parent_id and self._client:
-                loop = asyncio.get_running_loop()
-                reply_ctx = await loop.run_in_executor(
-                    None, self._get_message_content_sync, parent_id
-                )
-                if reply_ctx:
-                    content_parts.insert(0, reply_ctx)
 
             content = "\n".join(content_parts) if content_parts else ""
 
