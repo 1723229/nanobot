@@ -57,7 +57,10 @@ class ChannelManager:
                         session_manager=self.session_manager,
                         full_config=self.config,
                         cron_service=self.cron_service,
+                        channel_manager=self,
                     )
+                elif name == "zzdingtalk":
+                    channel = cls(section, self.bus, channel_manager=self)
                 else:
                     channel = cls(section, self.bus)
                 channel.transcription_api_key = groq_key

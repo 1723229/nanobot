@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -71,6 +71,7 @@ def create_app(
     session_manager: SessionManager | None = None,
     config: Config | None = None,
     cron_service: CronService | None = None,
+    channel_manager: Any = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application.
 
@@ -144,6 +145,7 @@ def create_app(
     app.state.cron_service = cron_service
     app.state.bus = bus
     app.state.web_channel = web_channel  # may be None in standalone
+    app.state.channel_manager = channel_manager
 
     _register_routes(app)
     return app
@@ -181,6 +183,25 @@ def _make_provider(config: Config):
 
 def _register_routes(app: FastAPI) -> None:
     """Register all API routes."""
+
+    # ------ 浙政钉 webhook (integrated mode) ------
+    channel_manager = getattr(app.state, "channel_manager", None)
+    zz_ch = channel_manager.get_channel("zzdingtalk") if channel_manager else None
+    if zz_ch is not None:
+        cfg = zz_ch.config
+        if getattr(cfg, "webhook_integrated", True):
+            path = getattr(cfg, "webhook_path", "/zzdingtalk/webhook")
+
+            @app.post(path)
+            async def zzdingtalk_webhook_post(request: Request):
+                return await zz_ch._webhook_handler(request)
+
+            @app.get(path)
+            async def zzdingtalk_webhook_get():
+                """GET for URL verification (浙政钉 may use GET when configuring callback)."""
+                return {"status": "ok", "channel": "zzdingtalk"}
+
+            logger.info("浙政钉 webhook registered at {} (POST + GET)", path)
 
     # ------ Chat ------
 
@@ -364,6 +385,9 @@ def _register_routes(app: FastAPI) -> None:
         visible_messages = []
         for m in session.messages:
             role = m.get("role", "")
+            # Skip system messages (prompts, OpenViking memory injection, etc.)
+            if role == "system":
+                continue
             # Skip tool result messages (e.g. SKILL.md content, file reads, etc.)
             if role == "tool":
                 continue
@@ -424,7 +448,7 @@ def _register_routes(app: FastAPI) -> None:
                 })
 
         channels_status = []
-        for ch_name in ["whatsapp", "telegram", "discord", "feishu", "dingtalk", "email", "slack", "qq", "web"]:
+        for ch_name in ["whatsapp", "telegram", "discord", "feishu", "dingtalk", "zzdingtalk", "email", "slack", "qq", "web"]:
             ch_cfg = getattr(config.channels, ch_name, None)
             if ch_cfg:
                 channels_status.append({

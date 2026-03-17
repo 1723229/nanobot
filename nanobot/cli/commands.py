@@ -578,6 +578,16 @@ def gateway(
 
     cron.on_job = on_cron_job
 
+    # When web is enabled, use gateway port so a single port (e.g. 18790) serves both
+    # gateway and web/zzdingtalk (Docker typically exposes only gateway.port).
+    web_cfg = getattr(config.channels, "web", None)
+    if web_cfg is not None:
+        enabled = web_cfg.get("enabled", False) if isinstance(web_cfg, dict) else getattr(web_cfg, "enabled", False)
+        if enabled:
+            from nanobot.config.schema import WebConfig
+            base = web_cfg if isinstance(web_cfg, dict) else web_cfg.model_dump()
+            config.channels.web = WebConfig(**{**base, "port": port})
+
     # Create channel manager
     channels = ChannelManager(config, bus, session_manager=session_manager, cron_service=cron)
 

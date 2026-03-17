@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -40,11 +40,13 @@ class WebChannel(BaseChannel):
         session_manager: "SessionManager | None" = None,
         full_config: "Config | None" = None,
         cron_service: "CronService | None" = None,
+        channel_manager: Any = None,
     ):
         super().__init__(config, bus)
         self.session_manager = session_manager
         self.full_config = full_config
         self.cron_service = cron_service
+        self._channel_manager = channel_manager
         # session_id -> set of connected WebSocket instances
         self._connections: dict[str, set[WebSocket]] = {}
         self._server: Any = None  # uvicorn.Server, set in start()
@@ -69,6 +71,7 @@ class WebChannel(BaseChannel):
             session_manager=self.session_manager,
             config=self.full_config,
             cron_service=self.cron_service,
+            channel_manager=self._channel_manager,
         )
 
         uvi_config = uvicorn.Config(
