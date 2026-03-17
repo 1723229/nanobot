@@ -42,7 +42,6 @@ class VikingClient:
         embedding_api_key: str = "",
         embedding_base_url: str = "",
         embedding_dimension: int = 1024,
-        min_recall_score: float = 0.5,
     ):
         if not HAS_OPENVIKING:
             raise RuntimeError("openviking package is not installed. Install with: pip install openviking")
@@ -79,7 +78,6 @@ class VikingClient:
             ).hexdigest()[:12]
 
         self._commit_semaphore = asyncio.Semaphore(1)
-        self.min_recall_score = min_recall_score
 
     def set_max_concurrent_commits(self, n: int) -> None:
         """Update the concurrency limit for commit operations."""
@@ -165,7 +163,6 @@ class VikingClient:
         embedding_api_key: str = "",
         embedding_base_url: str = "",
         embedding_dimension: int = 1024,
-        min_recall_score: float = 0.5,
     ) -> "VikingClient":
         """Factory: create and initialise a VikingClient."""
         instance = cls(
@@ -182,7 +179,6 @@ class VikingClient:
             embedding_api_key=embedding_api_key,
             embedding_base_url=embedding_base_url,
             embedding_dimension=embedding_dimension,
-            min_recall_score=min_recall_score,
         )
         await instance._initialize()
         return instance
@@ -207,7 +203,6 @@ class VikingClient:
             embedding_api_key=cfg.embedding_api_key,
             embedding_base_url=cfg.embedding_base_url,
             embedding_dimension=cfg.embedding_dimension,
-            min_recall_score=getattr(cfg, "min_recall_score", 0.5),
         )
 
     # ------------------------------------------------------------------
@@ -465,50 +460,19 @@ class VikingClient:
         last = parts[-1] if parts else ""
         return last in (".overview.md", ".abstract.md")
 
-    @staticmethod
-    def _filter_recall_results(
-        user_memory: list, agent_memory: list, min_recall_score: float
-    ) -> tuple[list, list]:
-        """Filter by min_recall_score and exclude schema URIs."""
-        def keep(m):
-            uri = getattr(m, "uri", "") or ""
-            score = getattr(m, "score", 0.0)
-            return score >= min_recall_score and not VikingClient._is_schema_uri(uri)
-
-        return (
-            [m for m in (user_memory or []) if keep(m)],
-            [m for m in (agent_memory or []) if keep(m)],
-        )
-
     async def get_viking_memory_context(self, current_message: str) -> str:
-        """Return formatted Viking memory context for the system prompt.
-
-        Only injects memories when:
-        - Top score >= min_recall_score (avoids low-relevance noise)
-        - URI is not schema/overview (.overview.md, .abstract.md)
-        """
-        start = time.perf_counter()
+        """Return formatted Viking memory context for the system prompt."""
         result = await self.search_memory(current_message, limit=5)
         if not result:
-            logger.debug("[READ_USER_MEMORY]: cost {:.2f}s, search failed", time.perf_counter() - start)
             return ""
         user_raw = result.get("user_memory", [])
         agent_raw = result.get("agent_memory", [])
-        user_memory, agent_memory = self._filter_recall_results(
-            user_raw, agent_raw, self.min_recall_score
-        )
-        if not user_memory and not agent_memory:
-            logger.debug(
-                "[READ_USER_MEMORY]: cost {:.2f}s, no matches",
-                time.perf_counter() - start,
-            )
-            return ""
+        user_memory = [m for m in user_raw if not VikingClient._is_schema_uri(getattr(m, "uri", "") or "")]
+        agent_memory = [m for m in agent_raw if not VikingClient._is_schema_uri(getattr(m, "uri", "") or "")]
         user_text = self._format_memories(user_memory)
         agent_text = self._format_memories(agent_memory)
         if not user_text and not agent_text:
             return ""
-        cost = time.perf_counter() - start
-        logger.info("[READ_USER_MEMORY]: cost {:.2f}s, user={}, agent={}", cost, len(user_memory), len(agent_memory))
         return (
             "## Related Memories (use tools for details)\n"
             f"### User Memories\n{user_text or '(none)'}\n"

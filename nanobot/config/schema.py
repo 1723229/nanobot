@@ -71,7 +71,6 @@ class OpenVikingConfig(Base):
     embedding_base_url: str = ""
     embedding_dimension: int = 1024
     max_concurrent_commits: int = 1
-    min_recall_score: float = 0.5  # Skip Viking injection when top score < this
 
 
 class WebConfig(BaseModel):
