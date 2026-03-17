@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import hashlib
 import json
 import re
@@ -41,6 +42,7 @@ class VikingClient:
         embedding_api_key: str = "",
         embedding_base_url: str = "",
         embedding_dimension: int = 1024,
+        min_recall_score: float = 0.5,
     ):
         if not HAS_OPENVIKING:
             raise RuntimeError("openviking package is not installed. Install with: pip install openviking")
@@ -77,6 +79,7 @@ class VikingClient:
             ).hexdigest()[:12]
 
         self._commit_semaphore = asyncio.Semaphore(1)
+        self.min_recall_score = min_recall_score
 
     def set_max_concurrent_commits(self, n: int) -> None:
         """Update the concurrency limit for commit operations."""
@@ -162,6 +165,7 @@ class VikingClient:
         embedding_api_key: str = "",
         embedding_base_url: str = "",
         embedding_dimension: int = 1024,
+        min_recall_score: float = 0.5,
     ) -> "VikingClient":
         """Factory: create and initialise a VikingClient."""
         instance = cls(
@@ -178,6 +182,7 @@ class VikingClient:
             embedding_api_key=embedding_api_key,
             embedding_base_url=embedding_base_url,
             embedding_dimension=embedding_dimension,
+            min_recall_score=min_recall_score,
         )
         await instance._initialize()
         return instance
@@ -202,6 +207,7 @@ class VikingClient:
             embedding_api_key=cfg.embedding_api_key,
             embedding_base_url=cfg.embedding_base_url,
             embedding_dimension=cfg.embedding_dimension,
+            min_recall_score=getattr(cfg, "min_recall_score", 0.5),
         )
 
     # ------------------------------------------------------------------
@@ -278,12 +284,19 @@ class VikingClient:
         result = await self.client.search(query, target_uri=uri)
         return [self._matched_to_dict(m) for m in getattr(result, "memories", [])]
 
-    async def search_memory(self, query: str, limit: int = 10) -> dict[str, list[Any]]:
-        """Search both user and agent memories."""
-        if not await self._ensure_user(self.user_id):
+    async def search_memory(
+        self, query: str, limit: int = 10, sender_id: str | None = None
+    ) -> dict[str, list[Any]]:
+        """Search both user and agent memories.
+
+        When sender_id is provided, user memory is searched for that user;
+        otherwise uses config user_id.
+        """
+        uid = (sender_id or self.user_id) or self.user_id
+        if not await self._ensure_user(uid):
             return {"user_memory": [], "agent_memory": []}
 
-        uri_user = f"viking://user/{self.user_id}/memories/"
+        uri_user = f"viking://user/{uid}/memories/"
         user_result = await self.client.find(query=query, target_uri=uri_user, limit=limit)
 
         uri_agent = f"viking://agent/{self.agent_space_name}/memories/"
@@ -327,8 +340,19 @@ class VikingClient:
             logger.warning("Failed to read content from {}: {}", uri, e)
             return ""
 
-    async def grep(self, uri: str, pattern: str, case_insensitive: bool = False) -> Any:
-        return await self.client.grep(uri, pattern, case_insensitive=case_insensitive)
+    async def grep(
+        self,
+        uri: str,
+        pattern: str,
+        case_insensitive: bool = False,
+        node_limit: int = 10,
+    ) -> Any:
+        try:
+            return await self.client.grep(
+                uri, pattern, case_insensitive=case_insensitive, node_limit=node_limit
+            )
+        except TypeError:
+            return await self.client.grep(uri, pattern, case_insensitive=case_insensitive)
 
     async def glob(self, pattern: str, uri: str | None = None) -> Any:
         return await self.client.glob(pattern, uri=uri)
@@ -441,27 +465,75 @@ class VikingClient:
     # Memory context helpers
     # ------------------------------------------------------------------
 
-    async def get_viking_memory_context(self, current_message: str) -> str:
-        """Return formatted Viking memory context for the system prompt."""
-        result = await self.search_memory(current_message, limit=5)
+    @staticmethod
+    def _is_schema_uri(uri: str) -> bool:
+        """Exclude structural metadata (overview/abstract) from recall."""
+        parts = uri.rstrip("/").split("/")
+        last = parts[-1] if parts else ""
+        return last in (".overview.md", ".abstract.md")
+
+    @staticmethod
+    def _filter_recall_results(
+        user_memory: list, agent_memory: list, min_recall_score: float
+    ) -> tuple[list, list]:
+        """Filter by min_recall_score and exclude schema URIs."""
+        def keep(m):
+            uri = getattr(m, "uri", "") or ""
+            score = getattr(m, "score", 0.0)
+            return score >= min_recall_score and not VikingClient._is_schema_uri(uri)
+
+        return (
+            [m for m in (user_memory or []) if keep(m)],
+            [m for m in (agent_memory or []) if keep(m)],
+        )
+
+    async def get_viking_memory_context(
+        self, current_message: str, sender_id: str | None = None
+    ) -> str:
+        """Return formatted Viking memory context for the system prompt.
+
+        Only injects memories when:
+        - Top score >= min_recall_score (avoids low-relevance noise)
+        - URI is not schema/overview (.overview.md, .abstract.md)
+        """
+        start = time.perf_counter()
+        result = await self.search_memory(current_message, limit=5, sender_id=sender_id)
         if not result:
+            logger.debug("[READ_USER_MEMORY]: cost {:.2f}s, search failed", time.perf_counter() - start)
             return ""
-        user_text = self._format_memories(result.get("user_memory", []))
-        agent_text = self._format_memories(result.get("agent_memory", []))
+        user_raw = result.get("user_memory", [])
+        agent_raw = result.get("agent_memory", [])
+        user_memory, agent_memory = self._filter_recall_results(
+            user_raw, agent_raw, self.min_recall_score
+        )
+        if not user_memory and not agent_memory:
+            logger.debug(
+                "[READ_USER_MEMORY]: cost {:.2f}s, no matches",
+                time.perf_counter() - start,
+            )
+            return ""
+        user_text = self._format_memories(user_memory)
+        agent_text = self._format_memories(agent_memory)
         if not user_text and not agent_text:
             return ""
+        cost = time.perf_counter() - start
+        logger.info("[READ_USER_MEMORY]: cost {:.2f}s, user={}, agent={}", cost, len(user_memory), len(agent_memory))
         return (
             "## Related Memories (use tools for details)\n"
             f"### User Memories\n{user_text or '(none)'}\n"
             f"### Agent Memories\n{agent_text or '(none)'}"
         )
 
-    async def get_viking_user_profile(self) -> str:
-        if not await self._ensure_user(self.user_id):
+    async def get_viking_user_profile(self, sender_id: str | None = None) -> str:
+        start = time.perf_counter()
+        uid = (sender_id or self.user_id) or self.user_id
+        if not await self._ensure_user(uid):
             return ""
         content = await self.read_content(
-            uri=f"viking://user/{self.user_id}/memories/profile.md", level="read"
+            uri=f"viking://user/{uid}/memories/profile.md", level="read"
         )
+        cost = time.perf_counter() - start
+        logger.info("[READ_USER_PROFILE]: cost {:.2f}s, profile={}", cost, "yes" if content else "none")
         if not content:
             return ""
         return f"## User Profile\n{content}"

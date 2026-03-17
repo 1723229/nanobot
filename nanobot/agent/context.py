@@ -39,13 +39,16 @@ class ContextBuilder:
         self,
         skill_names: list[str] | None = None,
         current_message: str = "",
+        sender_id: str | None = None,
     ) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
         parts = [self._get_identity()]
 
         # Semantic user profile
         if self._viking_client:
-            profile = await self.memory.get_viking_user_profile(self._viking_client)
+            profile = await self.memory.get_viking_user_profile(
+                self._viking_client, sender_id=sender_id
+            )
             if profile:
                 parts.append(profile)
 
@@ -136,10 +139,10 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         lines = [f"Current Time: {current_time_str()}"]
         if channel and chat_id:
             lines += [f"Channel: {channel}", f"Chat ID: {chat_id}"]
-        if sender_id and sender_name:
-            lines += {f"Sender ID: {sender_id}"}
-        if sender_id and sender_name:
-            lines += {f"Sender Name: {sender_name}"}
+        if sender_id:
+            lines.append(f"Sender ID: {sender_id}")
+        if sender_name:
+            lines.append(f"Sender Name: {sender_name}")
         return ContextBuilder._RUNTIME_CONTEXT_TAG + "\n" + "\n".join(lines)
 
     def _load_bootstrap_files(self) -> str:
@@ -175,12 +178,12 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             merged = [{"type": "text", "text": runtime_ctx}] + user_content
 
         system_prompt = await self.build_system_prompt(
-            skill_names, current_message=current_message,
+            skill_names, current_message=current_message, sender_id=sender_id
         )
 
         if self._viking_client and current_message:
             viking_mem = await self.memory.get_viking_memory_context(
-                current_message, self._viking_client
+                current_message, self._viking_client, sender_id=sender_id
             )
             if viking_mem:
                 system_prompt += (
