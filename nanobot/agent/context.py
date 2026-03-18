@@ -164,6 +164,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         chat_id: str | None = None,
         sender_id: str | None = None,
         sender_name: str | None = None,
+        current_role: str = "user",
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
         runtime_ctx = self._build_runtime_context(channel, chat_id, sender_id, sender_name)
@@ -192,7 +193,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         messages = [
             {"role": "system", "content": system_prompt},
             *history,
-            {"role": "user", "content": merged},
+            {"role": current_role, "content": merged},
         ]
 
         return messages
@@ -213,7 +214,11 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             if not mime or not mime.startswith("image/"):
                 continue
             b64 = base64.b64encode(raw).decode()
-            images.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+            images.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64}"},
+                "_meta": {"path": str(p)},
+            })
 
         if not images:
             return text
