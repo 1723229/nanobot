@@ -607,6 +607,7 @@ class CronService:
                 job.wake_mode = patch["wake_mode"]
             if "delivery_mode" in patch:
                 job.delivery.mode = patch["delivery_mode"]
+                job.payload.deliver = (patch["delivery_mode"] == "announce")
             if "delivery_channel" in patch:
                 job.delivery.channel = patch["delivery_channel"]
             if "delivery_to" in patch:
