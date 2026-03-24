@@ -37,7 +37,7 @@ class CronTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Schedule reminders and recurring tasks. Actions: add, list, remove, update."
+        return "Schedule reminders and recurring tasks. Actions: add, list, remove."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -46,10 +46,10 @@ class CronTool(Tool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "remove", "update"],
+                    "enum": ["add", "list", "remove"],
                     "description": "Action to perform",
                 },
-                "message": {"type": "string", "description": "Reminder message (for add/update)"},
+                "message": {"type": "string", "description": "Reminder message (for add)"},
                 "every_seconds": {
                     "type": "integer",
                     "description": "Interval in seconds (for recurring tasks)",
@@ -90,8 +90,6 @@ class CronTool(Tool):
             return self._list_jobs()
         elif action == "remove":
             return self._remove_job(job_id)
-        elif action == "update":
-            return self._update_job(job_id, message)
         return f"Unknown action: {action}"
 
     def _add_job(
@@ -198,17 +196,4 @@ class CronTool(Tool):
             return "Error: job_id is required for remove"
         if self._cron.remove_job(job_id):
             return f"Removed job {job_id}"
-        return f"Job {job_id} not found"
-
-    def _update_job(self, job_id: str | None, message: str = "") -> str:
-        if not job_id:
-            return "Error: job_id is required for update"
-        patch: dict[str, Any] = {}
-        if message:
-            patch["message"] = message
-        if not patch:
-            return "Error: nothing to update"
-        result = self._cron.update_job(job_id, **patch)
-        if result:
-            return f"Updated job '{result.name}' ({result.id})"
         return f"Job {job_id} not found"
