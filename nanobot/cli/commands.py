@@ -525,6 +525,7 @@ def gateway(
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
 
+    # Preserve existing single-workspace installs, but keep custom workspaces clean.
     if is_default_workspace(config.workspace_path):
         _migrate_cron_store(config)
 
@@ -728,6 +729,7 @@ def agent(
     bus = MessageBus()
     provider = _make_provider(config)
 
+    # Preserve existing single-workspace installs, but keep custom workspaces clean.
     if is_default_workspace(config.workspace_path):
         _migrate_cron_store(config)
 
