@@ -62,6 +62,8 @@ RUN apt-get update && \
 # Create config directory
 RUN mkdir -p /root/.hiperone
 
+RUN uv tool install minimax-coding-plan-mcp
+
 # Gateway default port
 EXPOSE 18790
 
