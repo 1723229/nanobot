@@ -513,7 +513,7 @@ class FeishuChannel(BaseChannel):
             "rows": [{f"c{i}": r[i] if i < len(r) else "" for i in range(len(headers))} for r in rows],
         }
 
-    _MAX_CARD_TABLES = 4
+    _MAX_CARD_TABLES = 1
 
     def _build_card_elements(self, content: str) -> list[dict]:
         """Split content into div/markdown + table elements for Feishu card."""
@@ -1120,14 +1120,19 @@ class FeishuChannel(BaseChannel):
                     await loop.run_in_executor(None, _do_send, "post", post_body)
 
                 else:
-                    # Complex / long content – send as interactive card
+                    # Complex / long content – send as interactive card.
+                    # Feishu limits cards to 1 native table element (API error 11310).
+                    # When content has multiple tables we render everything as a
+                    # single markdown-only card to preserve reply completeness.
                     elements = self._build_card_elements(msg.content)
-                    for chunk in self._split_elements_by_table_limit(elements):
-                        card = {"config": {"wide_screen_mode": True}, "elements": chunk}
-                        await loop.run_in_executor(
-                            None, _do_send,
-                            "interactive", json.dumps(card, ensure_ascii=False),
-                        )
+                    table_count = sum(1 for el in elements if el.get("tag") == "table")
+                    if table_count > 1:
+                        elements = [{"tag": "markdown", "content": msg.content}]
+                    card = {"config": {"wide_screen_mode": True}, "elements": elements}
+                    await loop.run_in_executor(
+                        None, _do_send,
+                        "interactive", json.dumps(card, ensure_ascii=False),
+                    )
 
         except Exception as e:
             logger.error("Error sending Feishu message: {}", e)
