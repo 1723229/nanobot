@@ -26,8 +26,9 @@ class ContextBuilder:
     BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
-    def __init__(self, workspace: Path, viking_client: VikingClient | None = None):
+    def __init__(self, workspace: Path, timezone: str | None = None, viking_client: VikingClient | None = None):
         self.workspace = workspace
+        self.timezone = timezone
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(workspace)
         self._viking_client = viking_client
@@ -135,11 +136,12 @@ IMPORTANT: To send files (images, documents, audio, video) to the user, you MUST
     def _build_runtime_context(
         channel: str | None,
         chat_id: str | None,
+        timezone: str | None = None,
         sender_id: str | None = None,
         sender_name: str | None = None,
     ) -> str:
         """Build untrusted runtime metadata block for injection before the user message."""
-        lines = [f"Current Time: {current_time_str()}"]
+        lines = [f"Current Time: {current_time_str(timezone)}"]
         if channel and chat_id:
             lines += [f"Channel: {channel}", f"Chat ID: {chat_id}"]
         if sender_id:
@@ -173,7 +175,7 @@ IMPORTANT: To send files (images, documents, audio, video) to the user, you MUST
         current_role: str = "user",
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
-        runtime_ctx = self._build_runtime_context(channel, chat_id, sender_id, sender_name)
+        runtime_ctx = self._build_runtime_context(channel, chat_id, self.timezone, sender_id, sender_name)
         user_content = self._build_user_content(current_message, media)
 
         if isinstance(user_content, str):
