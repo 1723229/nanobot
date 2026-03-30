@@ -6,6 +6,8 @@ import re
 import shutil
 from pathlib import Path
 
+from loguru import logger
+
 # Default builtin skills directory (relative to this file)
 BUILTIN_SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
@@ -53,8 +55,23 @@ class SkillsLoader:
 
         # Filter by requirements
         if filter_unavailable:
-            return [s for s in skills if self._check_requirements(self._get_skill_meta(s["name"]))]
+            return [
+                s for s in skills
+                if self._skill_is_readable(s["name"]) and self._check_requirements(self._get_skill_meta(s["name"]))
+            ]
         return skills
+
+    def _read_skill_file(self, skill_file: Path) -> str | None:
+        """Read a skill file as UTF-8, skipping invalid files."""
+        try:
+            return skill_file.read_text(encoding="utf-8")
+        except UnicodeDecodeError as e:
+            logger.warning(f"Skipping skill {skill_file}: invalid UTF-8 ({e})")
+            return None
+
+    def _skill_is_readable(self, name: str) -> bool:
+        """Return whether the skill file can be decoded as UTF-8."""
+        return self.load_skill(name) is not None
 
     def load_skill(self, name: str) -> str | None:
         """
@@ -69,13 +86,13 @@ class SkillsLoader:
         # Check workspace first
         workspace_skill = self.workspace_skills / name / "SKILL.md"
         if workspace_skill.exists():
-            return workspace_skill.read_text(encoding="utf-8")
+            return self._read_skill_file(workspace_skill)
 
         # Check built-in
         if self.builtin_skills:
             builtin_skill = self.builtin_skills / name / "SKILL.md"
             if builtin_skill.exists():
-                return builtin_skill.read_text(encoding="utf-8")
+                return self._read_skill_file(builtin_skill)
 
         return None
 
