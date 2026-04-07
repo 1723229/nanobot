@@ -125,8 +125,10 @@ def create_app(
             model=config.agents.defaults.model,
             max_iterations=config.agents.defaults.max_tool_iterations,
             context_window_tokens=config.agents.defaults.context_window_tokens,
-            web_search_config=config.tools.web.search,
-            web_proxy=config.tools.web.proxy or None,
+            web_config=config.tools.web,
+            context_block_limit=config.agents.defaults.context_block_limit,
+            max_tool_result_chars=config.agents.defaults.max_tool_result_chars,
+            provider_retry_mode=config.agents.defaults.provider_retry_mode,
             exec_config=config.tools.exec,
             cron_service=cron_service,
             restrict_to_workspace=config.tools.restrict_to_workspace,
@@ -134,6 +136,7 @@ def create_app(
             mcp_servers=config.tools.mcp_servers,
             channels_config=config.channels,
             openviking_config=config.openviking,
+            timezone=config.agents.defaults.timezone,
         )
         app.state.agent = agent
     else:

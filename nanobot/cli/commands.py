@@ -576,6 +576,7 @@ def serve(
         session_manager=session_manager,
         mcp_servers=runtime_config.tools.mcp_servers,
         channels_config=runtime_config.channels,
+        openviking_config=runtime_config.openviking,
         timezone=runtime_config.agents.defaults.timezone,
     )
 
@@ -899,6 +900,7 @@ def agent(
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
+        openviking_config=config.openviking,
         timezone=config.agents.defaults.timezone,
     )
     restart_notice = consume_restart_notice_from_env()
@@ -1313,8 +1315,10 @@ def web(
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
-        web_search_config=config.tools.web.search,
-        web_proxy=config.tools.web.proxy or None,
+        web_config=config.tools.web,
+        context_block_limit=config.agents.defaults.context_block_limit,
+        max_tool_result_chars=config.agents.defaults.max_tool_result_chars,
+        provider_retry_mode=config.agents.defaults.provider_retry_mode,
         exec_config=config.tools.exec,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
@@ -1322,6 +1326,7 @@ def web(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         openviking_config=config.openviking,
+        timezone=config.agents.defaults.timezone,
     )
 
     # Set cron callback (needs agent + heartbeat)

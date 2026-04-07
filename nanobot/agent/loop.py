@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import os
 import time
 from contextlib import AsyncExitStack, nullcontext
@@ -18,8 +17,6 @@ from nanobot.agent.hook import AgentHook, AgentHookContext, CompositeHook
 from nanobot.agent.memory import Consolidator, Dream
 from nanobot.agent.runner import AgentRunSpec, AgentRunner
 from nanobot.agent.subagent import SubagentManager
-from nanobot.hooks.manager import HookManager
-from nanobot.hooks.base import HookContext
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
@@ -39,7 +36,7 @@ from nanobot.utils.helpers import image_placeholder_text, truncate_text
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, WebToolsConfig
+    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, OpenVikingConfig, WebToolsConfig
     from nanobot.cron.service import CronService
 
 
@@ -233,13 +230,7 @@ class AgentLoop:
 
         self.openviking_config = openviking_config
         self._current_session_key: str = "default"
-        self._current_sender_id: str = ""
-        self._current_channel: str = ""
         self._viking_client_initialized = False
-        self.hook_manager = HookManager()
-        if openviking_config and openviking_config.enabled:
-            self._register_openviking_hooks()
-        self._register_self_improvement_hooks()
 
         self._running = False
         self._mcp_servers = mcp_servers or {}
@@ -262,7 +253,6 @@ class AgentLoop:
             context_window_tokens=context_window_tokens,
             build_messages=self.context.build_messages,
             get_tool_definitions=self.tools.get_definitions,
-            on_consolidated=self._fire_compact_hook,
             max_completion_tokens=provider.generation.max_tokens,
         )
         self.dream = Dream(
@@ -304,24 +294,8 @@ class AgentLoop:
         if self.openviking_config and self.openviking_config.enabled:
             self._register_openviking_tools()
 
-    def _register_openviking_hooks(self) -> None:
-        """Register OpenViking hooks."""
-        try:
-            from nanobot.hooks.openviking import register_openviking_hooks
-            register_openviking_hooks(self.hook_manager)
-        except Exception:
-            logger.exception("Failed to register OpenViking hooks")
-
-    def _register_self_improvement_hooks(self) -> None:
-        """Register self-improvement hooks for error detection."""
-        try:
-            from nanobot.hooks.self_improvement import register_self_improvement_hooks
-            register_self_improvement_hooks(self.hook_manager)
-        except Exception:
-            logger.exception("Failed to register self-improvement hooks")
-
     async def _ensure_viking_client(self) -> None:
-        """Lazily create VikingClient and inject into ContextBuilder, tools, and hooks."""
+        """Lazily create VikingClient and inject into ContextBuilder and tools."""
         if self._viking_client_initialized:
             return
         self._viking_client_initialized = True
@@ -341,11 +315,6 @@ class AgentLoop:
 
             from nanobot.agent.tools.openviking import _OVTool
             _OVTool._shared_client = client
-
-            for hooks in self.hook_manager._hooks.values():
-                for hook in hooks:
-                    if hasattr(hook, "set_client"):
-                        hook.set_client(client)
 
             logger.info("OpenViking client initialised (mode={})", self.openviking_config.mode)
         except Exception:
@@ -381,26 +350,6 @@ class AgentLoop:
             logger.info("Registered {} OpenViking tools", 8)
         except Exception:
             logger.exception("Failed to register OpenViking tools")
-
-    async def _fire_compact_hook(
-        self, messages: list[dict], session_key: str,
-    ) -> None:
-        """Fire the message.compact hook after successful memory consolidation."""
-        if not self.hook_manager.has_hooks("message.compact"):
-            return
-
-        class _MsgBag:
-            """Lightweight stand-in for Session so the hook can read .messages."""
-            def __init__(self, msgs: list[dict]) -> None:
-                self.messages = msgs
-
-        ctx = HookContext(
-            event_type="message.compact",
-            session_key=session_key,
-            sender_id=self._current_sender_id,
-            channel=self._current_channel,
-        )
-        await self.hook_manager.fire("message.compact", ctx, session=_MsgBag(messages))
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -670,8 +619,6 @@ class AgentLoop:
 
         key = session_key or msg.session_key
         self._current_session_key = key
-        self._current_sender_id = msg.sender_id
-        self._current_channel = msg.channel
         session = self.sessions.get_or_create(key)
         if self._restore_runtime_checkpoint(session):
             self.sessions.save(session)

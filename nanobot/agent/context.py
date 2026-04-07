@@ -144,8 +144,22 @@ class ContextBuilder:
             merged = f"{runtime_ctx}\n\n{user_content}"
         else:
             merged = [{"type": "text", "text": runtime_ctx}] + user_content
+        system_prompt = await self.build_system_prompt(skill_names)
+
+        if self._viking_client and current_message:
+            viking_mem = await self.memory.get_viking_memory_context(
+                current_message,
+                self._viking_client,
+            )
+            if viking_mem:
+                logger.info("OpenViking User Memory : {}", str(viking_mem)[:100])
+                system_prompt += (
+                    "\n\n## Your memories about the current conversation. "
+                    "If you need more details, use the tools.\n"
+                    + viking_mem
+                )
         messages = [
-            {"role": "system", "content": self.build_system_prompt(skill_names)},
+            {"role": "system", "content": system_prompt},
             *history,
         ]
         if messages[-1].get("role") == current_role:
@@ -154,8 +168,6 @@ class ContextBuilder:
             messages[-1] = last
             return messages
         messages.append({"role": current_role, "content": merged})
-        return messages
-
         return messages
 
     def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
