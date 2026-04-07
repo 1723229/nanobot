@@ -335,14 +335,13 @@ class FeishuChannel(BaseChannel):
             .app_secret(self.config.app_secret)
             .log_level(lark.LogLevel.INFO)
             .build()
+        )
 
         self._bot_open_id = self._fetch_bot_open_id()
         if self._bot_open_id:
             logger.info("Feishu bot open_id: {}", self._bot_open_id)
         else:
             logger.warning("Could not fetch bot open_id; @mention detection may be unreliable")
-
-        )
         builder = lark.EventDispatcherHandler.builder(
             self.config.encrypt_key or "",
             self.config.verification_token or "",
