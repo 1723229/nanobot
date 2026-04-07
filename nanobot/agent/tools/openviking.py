@@ -427,7 +427,11 @@ class OVAddResourceTool(_OVTool):
             client = await self._client()
             result = await client.add_resource(str(path), description, target_path=target_path, wait=wait)
             if result:
-                root_uri = result.get("result", {}).get("root_uri", result.get("root_uri", "unknown"))
+                payload = result.get("result", result)
+                root_uri = payload.get("root_uri", "unknown")
+                content_uri = payload.get("content_uri", root_uri)
+                if content_uri != root_uri:
+                    return f"Successfully added resource: root={root_uri} content={content_uri}"
                 return f"Successfully added resource: {root_uri}"
             return "Failed to add resource"
         except Exception as e:

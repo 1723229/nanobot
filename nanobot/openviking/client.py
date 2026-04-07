@@ -258,6 +258,12 @@ class VikingClient:
                 return False
             return any(u.get("user_id") == user_id for u in res)
         except Exception as e:
+            if self._is_optional_admin_api_error(e):
+                logger.debug(
+                    "OpenViking remote user existence check skipped because admin API is unavailable: {}",
+                    e,
+                )
+                return True
             logger.warning("Failed to check user existence: {}", e)
             return False
 
@@ -271,7 +277,7 @@ class VikingClient:
             )
             return True
         except Exception as e:
-            if "User already exists" in str(e):
+            if "User already exists" in str(e) or self._is_optional_admin_api_error(e):
                 return True
             logger.warning("Failed to initialize user {}: {}", user_id, e)
             return False
@@ -376,6 +382,7 @@ class VikingClient:
         result = await self.client.add_resource(
             path=local_path, reason=desc, wait=wait, **kwargs,
         )
+        await self._attach_content_uri(result)
         return result
 
     async def list_resources(self, path: str | None = None, recursive: bool = False) -> list:
@@ -384,19 +391,21 @@ class VikingClient:
         return await self.client.ls(path, recursive=recursive)
 
     async def read_content(self, uri: str, level: str = "abstract") -> str:
+        read_uri = uri
         try:
             if level == "abstract":
                 return await self.client.abstract(uri)
             elif level == "overview":
                 return await self.client.overview(uri)
             elif level == "read":
-                return await self.client.read(uri)
+                read_uri = await self._resolve_read_uri(uri)
+                return await self.client.read(read_uri)
             else:
                 raise ValueError(f"Unsupported level: {level}")
         except FileNotFoundError:
             return ""
         except Exception as e:
-            logger.warning("Failed to read content from {}: {}", uri, e)
+            logger.warning("Failed to read content from {} (resolved={}): {}", uri, read_uri, e)
             return ""
 
     async def grep(
@@ -522,7 +531,13 @@ class VikingClient:
             result = await session.commit()
             logger.debug("Committed {} messages to OpenViking session {}", len(messages), actual_sid)
             status = result.get("status", False)
-            return {"success": status is True or status == "committed"}
+            success = (
+                status is True
+                or status in {"committed", "accepted", "queued"}
+                or bool(result.get("task_id"))
+                or result.get("archived") is True
+            )
+            return {"success": success}
 
     # ------------------------------------------------------------------
     # Memory context helpers
@@ -559,6 +574,67 @@ class VikingClient:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_optional_admin_api_error(exc: Exception) -> bool:
+        message = str(exc)
+        markers = (
+            "Admin API is unavailable",
+            "Development mode does not support account or user management",
+            "Requires role:",
+            "Permission denied",
+        )
+        return any(marker in message for marker in markers)
+
+    async def _safe_stat(self, uri: str) -> dict[str, Any] | None:
+        try:
+            stat = await self.client.stat(uri)
+            return stat if isinstance(stat, dict) else None
+        except Exception:
+            return None
+
+    async def _resolve_read_uri(self, uri: str) -> str:
+        stat = await self._safe_stat(uri)
+        if not stat or not stat.get("isDir", False):
+            return uri
+
+        try:
+            entries = await self.client.ls(uri, recursive=True)
+        except Exception:
+            return uri
+
+        preferred_uri = ""
+        fallback_uri = ""
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("isDir", False):
+                continue
+            entry_uri = entry.get("uri", "")
+            if not entry_uri:
+                continue
+            fallback_uri = fallback_uri or entry_uri
+            name = entry.get("name", "")
+            if not isinstance(name, str) or name.startswith("."):
+                continue
+            preferred_uri = entry_uri
+            break
+
+        return preferred_uri or fallback_uri or uri
+
+    async def _attach_content_uri(self, result: dict[str, Any] | None) -> None:
+        if not isinstance(result, dict):
+            return
+
+        payload = result.get("result")
+        if not isinstance(payload, dict):
+            payload = result
+
+        root_uri = payload.get("root_uri") or payload.get("temp_uri")
+        if not isinstance(root_uri, str) or not root_uri:
+            return
+
+        content_uri = await self._resolve_read_uri(root_uri)
+        payload["content_uri"] = content_uri
+        payload["is_directory_root"] = content_uri != root_uri
 
     @staticmethod
     def _normalize_content(content: Any) -> str:
