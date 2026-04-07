@@ -1,186 +1,107 @@
 ---
 name: memory
-description: Enhanced memory system with two layers - grep-based MEMORY.md/HISTORY.md (always available) plus optional semantic search for structured conversation storage and advanced recall. When semantic memory is enabled, native tools (openviking_read, openviking_search, user_memory_search, openviking_memory_commit, etc.) are available directly. Use when users ask to remember information, search past conversations, recall previous discussions, or work with documents.
+description: Two-layer memory system with Dream-managed knowledge files.
 always: true
 ---
 
-# Memory System
+# Memory
 
-A dual-approach memory system combining simple markdown files with optional semantic search.
+## Structure
 
-## Core Layer (Always Available)
+- `SOUL.md` — Bot personality and communication style. **Managed by Dream.** Do NOT edit.
+- `USER.md` — User profile and preferences. **Managed by Dream.** Do NOT edit.
+- `memory/MEMORY.md` — Long-term facts (project context, important events). **Managed by Dream.** Do NOT edit.
+- `memory/history.jsonl` — append-only JSONL, not loaded into context. Prefer the built-in `grep` tool to search it.
 
-The foundational memory system that works without any dependencies:
+## Search Past Events
 
-### Structure
+`memory/history.jsonl` is JSONL format — each line is a JSON object with `cursor`, `timestamp`, `content`.
 
-- `memory/MEMORY.md` — Long-term facts (preferences, project context, relationships). Always loaded into your context.
-- `memory/HISTORY.md` — Append-only event log. NOT loaded into context. Search it with grep-style tools or in-memory filters. Each entry starts with [YYYY-MM-DD HH:MM].
+- For broad searches, start with `grep(..., path="memory", glob="*.jsonl", output_mode="count")` or the default `files_with_matches` mode before expanding to full content
+- Use `output_mode="content"` plus `context_before` / `context_after` when you need the exact matching lines
+- Use `fixed_strings=true` for literal timestamps or JSON fragments
+- Use `head_limit` / `offset` to page through long histories
+- Use `exec` only as a last-resort fallback when the built-in search cannot express what you need
 
-### Search Past Events
+Examples (replace `keyword`):
+- `grep(pattern="keyword", path="memory/history.jsonl", case_insensitive=true)`
+- `grep(pattern="2026-04-02 10:00", path="memory/history.jsonl", fixed_strings=true)`
+- `grep(pattern="keyword", path="memory", glob="*.jsonl", output_mode="count", case_insensitive=true)`
+- `grep(pattern="oauth|token", path="memory", glob="*.jsonl", output_mode="content", case_insensitive=true)`
 
-Choose the search method based on file size:
+## Important
 
-- Small `memory/HISTORY.md`: use `read_file`, then search in-memory
-- Large or long-lived `memory/HISTORY.md`: use the `exec` tool for targeted search
+- **Do NOT edit SOUL.md, USER.md, or MEMORY.md.** They are automatically managed by Dream.
+- If you notice outdated information, it will be corrected when Dream runs next.
+- Users can view Dream's activity with the `/dream-log` command.
 
-Examples:
-- **Linux/macOS:** `grep -i "keyword" memory/HISTORY.md`
-- **Windows:** `findstr /i "keyword" memory\HISTORY.md`
-- **Cross-platform Python:** `python -c "from pathlib import Path; text = Path('memory/HISTORY.md').read_text(encoding='utf-8'); print('\n'.join([l for l in text.splitlines() if 'keyword' in l.lower()][-20:]))"`
+## Semantic Memory
 
-Prefer targeted command-line search for large history files.
-
-### When to Update MEMORY.md
-
-Write important facts immediately using `edit_file` or `write_file`:
-- User preferences ("I prefer dark mode")
-- Project context ("The API uses OAuth2")
-- Relationships ("Alice is the project lead")
-
-### Auto-consolidation
-
-Old conversations are automatically summarized and appended to HISTORY.md when the session grows large. Long-term facts are extracted to MEMORY.md. You don't need to manage this. When semantic memory is enabled, conversations are also committed to the memory system during consolidation for semantic indexing.
-
----
-
-## Enhanced Layer (Semantic Memory) — Native Integration
-
-When semantic memory is enabled in config, you have **native tools** registered directly — no CLI scripts needed:
+When semantic memory is enabled in config, use the native tools for concept-level recall, persistent document search, and structured memory operations.
 
 ### Available Tools
 
 | Tool | Purpose |
 |------|---------|
 | `user_memory_search` | Semantic search over user memories |
-| `openviking_search` | Semantic search across all resources |
-| `openviking_read` | Read content at 3 levels: abstract, overview, full |
-| `openviking_list` | List resources in a path |
-| `openviking_grep` | Regex search within resources |
-| `openviking_glob` | Glob pattern matching |
-| `openviking_memory_commit` | Commit messages for persistent memory |
-| `openviking_add_resource` | Ingest files for semantic indexing |
+| `openviking_search` | Semantic search across indexed resources |
+| `openviking_read` | Read resource content at `abstract`, `overview`, or `read` level |
+| `openviking_list` | List resources in a URI/path |
+| `openviking_grep` | Regex search within indexed resources |
+| `openviking_glob` | Glob pattern matching over indexed resources |
+| `openviking_memory_commit` | Persist conversation messages into memory |
+| `openviking_add_resource` | Ingest local files for semantic indexing |
 
-### When to use semantic memory tools
+### When To Use Semantic Memory
 
-- User explicitly requests semantic search or advanced recall
-- Conversation contains important technical details worth structured storage
-- User provides documents/files that need persistent context
-- User asks "what did we discuss about X?" where grep might miss semantic connections
+- User asks to remember information beyond the current session
+- User asks what was discussed previously and keyword grep may be insufficient
+- User provides documents/files that should remain searchable later
+- You need semantic search over concepts instead of exact string matching
 
-### When NOT to use semantic memory tools
+### When Not To Use Semantic Memory
 
-- Simple fact storage (use MEMORY.md directly — it's faster)
-- Quick grep searches (grep is sufficient for keyword lookup)
-- User hasn't provided enough context to warrant structured storage
+- Exact keyword lookup in `memory/history.jsonl` is enough
+- Small factual updates belong in Dream-managed memory files
+- Semantic memory tools are unavailable or failing; fall back to grep-based retrieval
 
----
+### Recommended Recall Flow
 
-## Semantic Memory: Recall
+1. Search with `user_memory_search(...)` or `openviking_search(...)`
+2. Triage matches with `openviking_read(..., level="abstract")`
+3. Read full content only for relevant matches with `openviking_read(..., level="read")`
 
-Use a **tiered approach** to minimize token usage:
+Examples:
+- `user_memory_search(query="authentication flow")`
+- `openviking_search(query="authentication flow", target_uri="viking://resources/")`
+- `openviking_read(uri="viking://resources/docs/auth.md", level="abstract")`
+- `openviking_read(uri="viking://resources/docs/auth.md", level="read")`
 
-### Step 1: Search (Find Relevant URIs)
+### Conversation Commit
 
-```
-user_memory_search(query="authentication flow")
-```
+Use `openviking_memory_commit` for important conversations when semantic memory is enabled.
 
-Or search across all resources:
+- Commit when the user says "remember this"
+- Commit when important preferences, decisions, or technical context appear
+- Commit near the end of a substantial discussion if the content is likely to matter later
 
-```
-openviking_search(query="authentication flow", target_uri="viking://resources/")
-```
+Example:
+- `openviking_memory_commit(messages=[{"role": "user", "content": "I prefer TypeScript"}, {"role": "assistant", "content": "Noted"}])`
 
-### Step 2: Triage (Filter with Abstract)
+### File Ingestion
 
-For each result, get a ~100 token summary:
+Use `openviking_add_resource` to ingest user-provided files so they become semantically searchable.
 
-```
-openviking_read(uri="viking://resources/docs/auth.md", level="abstract")
-```
+- `openviking_add_resource(local_path="/path/to/file.pdf", description="API documentation", wait=true)`
 
-### Step 3: Full Content (Read)
-
-When confirmed relevant, read the full content:
-
-```
-openviking_read(uri="viking://resources/docs/auth.md", level="read")
-```
-
-**Workflow: search → abstract → read (only relevant ones)**
-
----
-
-## Semantic Memory: Conversation Storage
-
-### Commit Messages
-
-Use the `openviking_memory_commit` tool to persist important conversations:
-
-```
-openviking_memory_commit(messages=[
-  {"role": "user", "content": "I prefer TypeScript..."},
-  {"role": "assistant", "content": "I've noted your preference..."}
-])
-```
-
-**When to commit:**
-- Conversation reaches 8-10 turns
-- User shares important information (preferences, decisions, technical details)
-- User explicitly says "remember this" or similar
-- Session ending signals ("thanks", "goodbye")
-
-**Auto-commit:** Conversations are also automatically committed to the memory system during session consolidation via hooks.
-
----
-
-## Semantic Memory: File Ingestion
-
-```
-openviking_add_resource(local_path="/path/to/file.pdf", description="API documentation", wait=true)
-```
-
-Set `wait=true` so the content is immediately searchable after ingestion.
-
----
-
-## Choosing the Right Approach
-
-| Task | Use This |
-|------|----------|
-| Store simple fact | Edit MEMORY.md directly |
-| Search for keyword | grep on HISTORY.md |
-| Semantic search ("concepts related to X") | `user_memory_search` or `openviking_search` |
-| Read resource details | `openviking_read` (abstract → overview → read) |
-| Commit conversation to memory | `openviking_memory_commit` |
-| Ingest user's documents | `openviking_add_resource` |
-| Keyword search ("find 'deadline'") | grep HISTORY.md |
-
----
-
-## URI Namespaces
+### URI Namespaces
 
 | Namespace | Contents |
 |-----------|----------|
 | `viking://resources/` | Ingested documents and data |
-| `viking://user/{user_id}/memories/` | User preferences and context (auto-extracted from sessions) |
-| `viking://agent/{agent_space}/memories/` | Agent-learned patterns (auto-extracted from sessions) |
+| `viking://user/{user_id}/memories/` | User-specific memories |
+| `viking://agent/{agent_space}/memories/` | Agent-learned memories |
 
----
+### Fallback
 
-## Important Notes
-
-**Automatic context enrichment**: When semantic memory is enabled, related memories from past conversations are automatically injected into the system prompt based on the current message. This happens transparently — you'll see a "Semantic Memory" section in your context.
-
-**Fallback**: If semantic memory is unavailable or fails, always fall back to the core layer (MEMORY.md + HISTORY.md + grep). The core layer is the foundation.
-
-**CLI fallback**: The script `scripts/openviking_client.py` is still available as a CLI fallback via `exec`, but prefer the native tools when available. Do not mention the script name to users.
-
----
-
-## Reference
-
-- Core layer: `memory/MEMORY.md` (facts), `memory/HISTORY.md` (events)
-- Semantic memory tools: `user_memory_search`, `openviking_read`, `openviking_search`, `openviking_memory_commit`, etc.
-- URI scheme: `viking://resources/`, `viking://user/memories/`, `viking://agent/memories/`
+- If semantic memory is unavailable, always fall back to the core layer: Dream-managed files plus `memory/history.jsonl` search.

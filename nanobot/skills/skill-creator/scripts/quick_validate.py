@@ -21,10 +21,8 @@ ALLOWED_FRONTMATTER_KEYS = {
     "always",
     "license",
     "allowed-tools",
-    "compatibility",
-    "homepage",
 }
-ALLOWED_RESOURCE_DIRS = {"scripts", "references", "assets", "agents", "eval-viewer", "evals"}
+ALLOWED_RESOURCE_DIRS = {"scripts", "references", "assets"}
 PLACEHOLDER_MARKERS = ("[todo", "todo:")
 
 
@@ -189,16 +187,8 @@ def validate_skill(skill_path):
     if always is not None and not isinstance(always, bool):
         return False, f"'always' must be a boolean, got {type(always).__name__}"
 
-    compatibility = frontmatter.get("compatibility")
-    if compatibility is not None:
-        if not isinstance(compatibility, str):
-            return False, f"'compatibility' must be a string, got {type(compatibility).__name__}"
-        if len(compatibility) > 500:
-            return False, f"Compatibility is too long ({len(compatibility)} characters). Maximum is 500 characters."
-
-    allowed_root_files = {"SKILL.md", "LICENSE.txt", "LICENSE", "LICENSE.md"}
     for child in skill_path.iterdir():
-        if child.name in allowed_root_files:
+        if child.name == "SKILL.md":
             continue
         if child.is_dir() and child.name in ALLOWED_RESOURCE_DIRS:
             continue
@@ -207,8 +197,7 @@ def validate_skill(skill_path):
         return (
             False,
             f"Unexpected file or directory in skill root: {child.name}. "
-            f"Only SKILL.md, license files, and resource directories "
-            f"({', '.join(sorted(ALLOWED_RESOURCE_DIRS))}) are allowed.",
+            "Only SKILL.md, scripts/, references/, and assets/ are allowed.",
         )
 
     return True, "Skill is valid!"
