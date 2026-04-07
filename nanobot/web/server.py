@@ -232,12 +232,13 @@ def _register_routes(app: FastAPI) -> None:
             from nanobot.agent.loop import AgentLoop
 
             agent: AgentLoop = app.state.agent
-            response = await agent.process_direct(
+            response_msg = await agent.process_direct(
                 content=req.message,
                 session_key=session_key,
                 channel="web",
                 chat_id=chat_id,
             )
+            response = response_msg.content if response_msg else ""
             return ChatResponse(response=response, session_id=session_key)
 
     @app.post("/api/chat/stream")
@@ -257,12 +258,13 @@ def _register_routes(app: FastAPI) -> None:
         async def event_generator():
             yield f"data: {json.dumps({'type': 'start'})}\n\n"
             try:
-                response = await agent.process_direct(
+                response_msg = await agent.process_direct(
                     content=req.message,
                     session_key=session_key,
                     channel="web",
                     chat_id=session_key.split(":", 1)[-1] if ":" in session_key else session_key,
                 )
+                response = response_msg.content if response_msg else ""
                 chunk_size = 20
                 for i in range(0, len(response), chunk_size):
                     chunk = response[i : i + chunk_size]
@@ -330,17 +332,18 @@ def _register_routes(app: FastAPI) -> None:
                         )
                         await web_channel.notify_thinking(session_id)
                     else:
-                        # Standalone fallback – process directly
+                        # Standalone fallback — process directly
                         from nanobot.agent.loop import AgentLoop
 
                         agent: AgentLoop = app.state.agent
                         session_key = f"web:{session_id}"
-                        response = await agent.process_direct(
+                        response_msg = await agent.process_direct(
                             content=content,
                             session_key=session_key,
                             channel="web",
                             chat_id=session_id,
                         )
+                        response = response_msg.content if response_msg else ""
                         await websocket.send_text(json.dumps({
                             "type": "message",
                             "role": "assistant",
