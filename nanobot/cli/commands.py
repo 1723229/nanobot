@@ -164,7 +164,7 @@ def _print_agent_response(
     content = response or ""
     body = _response_renderable(content, render_markdown, metadata)
     console.print()
-    console.print(f"[cyan]{__logo__} nanobot[/cyan]")
+    console.print(f"[cyan]{__logo__} HiperOne[/cyan]")
     console.print(body)
     console.print()
 
@@ -200,7 +200,7 @@ async def _print_interactive_response(
         ansi = _render_interactive_ansi(
             lambda c: (
                 c.print(),
-                c.print(f"[cyan]{__logo__} nanobot[/cyan]"),
+                c.print(f"[cyan]{__logo__} HiperOne[/cyan]"),
                 c.print(_response_renderable(content, render_markdown, metadata)),
                 c.print(),
             )
@@ -248,7 +248,7 @@ async def _read_interactive_input_async() -> str:
 
 def version_callback(value: bool):
     if value:
-        console.print(f"{__logo__} nanobot v{__version__}")
+        console.print(f"{__logo__} HiperOne v{__version__}")
         raise typer.Exit()
 
 
@@ -351,7 +351,7 @@ def onboard(
         agent_cmd += f" --config {config_path}"
         gateway_cmd += f" --config {config_path}"
 
-    console.print(f"\n{__logo__} nanobot is ready!")
+    console.print(f"\n{__logo__} HiperOne is ready!")
     console.print("\nNext steps:")
     if wizard:
         console.print(f"  1. Chat: [cyan]{agent_cmd}[/cyan]")
@@ -649,7 +649,7 @@ def gateway(
     config = _load_runtime_config(config, workspace)
     port = port if port is not None else config.gateway.port
 
-    console.print(f"{__logo__} Starting nanobot gateway version {__version__} on port {port}...")
+    console.print(f"{__logo__} Starting HiperOne gateway version {__version__} on port {port}...")
     sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
@@ -1308,7 +1308,7 @@ def web(
     config.channels.web = web_cfg
     port = web_cfg.port
 
-    console.print(f"{__logo__} Starting nanobot web on {host}:{port}...")
+    console.print(f"{__logo__} Starting HiperOne web on {host}:{port}...")
     sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
@@ -1499,7 +1499,7 @@ def status():
     config = load_config()
     workspace = config.workspace_path
 
-    console.print(f"{__logo__} nanobot Status\n")
+    console.print(f"{__logo__} HiperOne Status\n")
 
     console.print(f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}")
     console.print(f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}")

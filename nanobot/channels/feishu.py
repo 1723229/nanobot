@@ -303,7 +303,6 @@ class FeishuChannel(BaseChannel):
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
         self._loop: asyncio.AbstractEventLoop | None = None
         self._user_name_cache: dict[str, str] = {}
-        self._bot_open_id: str = ""
         self._stream_bufs: dict[str, _FeishuStreamBuf] = {}
         self._bot_open_id: str | None = None
 
@@ -337,11 +336,6 @@ class FeishuChannel(BaseChannel):
             .build()
         )
 
-        self._bot_open_id = self._fetch_bot_open_id()
-        if self._bot_open_id:
-            logger.info("Feishu bot open_id: {}", self._bot_open_id)
-        else:
-            logger.warning("Could not fetch bot open_id; @mention detection may be unreliable")
         builder = lark.EventDispatcherHandler.builder(
             self.config.encrypt_key or "",
             self.config.verification_token or "",
@@ -370,6 +364,16 @@ class FeishuChannel(BaseChannel):
             log_level=lark.LogLevel.INFO,
         )
 
+        # Fetch bot's own open_id before opening the WebSocket so mention
+        # matching is ready for the first inbound messages.
+        self._bot_open_id = await asyncio.get_running_loop().run_in_executor(
+            None, self._fetch_bot_open_id
+        )
+        if self._bot_open_id:
+            logger.info("Feishu bot open_id: {}", self._bot_open_id)
+        else:
+            logger.warning("Could not fetch bot open_id; @mention matching may be inaccurate")
+
         # Start WebSocket client in a separate thread with reconnect loop.
         # A dedicated event loop is created for this thread so that lark_oapi's
         # module-level `loop = asyncio.get_event_loop()` picks up an idle loop
@@ -397,15 +401,6 @@ class FeishuChannel(BaseChannel):
 
         self._ws_thread = threading.Thread(target=run_ws, daemon=True)
         self._ws_thread.start()
-
-        # Fetch bot's own open_id for accurate @mention matching
-        self._bot_open_id = await asyncio.get_running_loop().run_in_executor(
-            None, self._fetch_bot_open_id
-        )
-        if self._bot_open_id:
-            logger.info("Feishu bot open_id: {}", self._bot_open_id)
-        else:
-            logger.warning("Could not fetch bot open_id; @mention matching may be inaccurate")
 
         logger.info("Feishu bot started with WebSocket long connection")
         logger.info("No public IP required - using WebSocket to receive events")
