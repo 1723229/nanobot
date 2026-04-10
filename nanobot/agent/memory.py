@@ -437,7 +437,7 @@ class Consolidator:
                 return idx
         return None
 
-    def estimate_session_prompt_tokens(self, session: Session) -> tuple[int, str]:
+    async def estimate_session_prompt_tokens(self, session: Session) -> tuple[int, str]:
         """Estimate current prompt size for the normal session history view."""
         history = session.get_history(max_messages=0)
         channel, chat_id = (session.key.split(":", 1) if ":" in session.key else (None, None))
@@ -500,7 +500,7 @@ class Consolidator:
             budget = self.context_window_tokens - self.max_completion_tokens - self._SAFETY_BUFFER
             target = budget // 2
             try:
-                estimated, source = self.estimate_session_prompt_tokens(session)
+                estimated, source = await self.estimate_session_prompt_tokens(session)
             except Exception:
                 logger.exception("Token estimation failed for {}", session.key)
                 estimated, source = 0, "error"
@@ -560,7 +560,7 @@ class Consolidator:
                 self.sessions.save(session)
 
                 try:
-                    estimated, source = self.estimate_session_prompt_tokens(session)
+                    estimated, source = await self.estimate_session_prompt_tokens(session)
                 except Exception:
                     logger.exception("Token estimation failed for {}", session.key)
                     estimated, source = 0, "error"

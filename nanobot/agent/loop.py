@@ -17,12 +17,14 @@ from nanobot.agent.context import ContextBuilder
 from nanobot.agent.hook import AgentHook, AgentHookContext, CompositeHook
 from nanobot.agent.memory import Consolidator, Dream
 from nanobot.agent.runner import AgentRunSpec, AgentRunner
+from nanobot.agent.skill_review import SkillReviewService
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.agent.tools.skills import SkillManageTool, SkillViewTool, SkillsListTool
 from nanobot.agent.tools.search import GlobTool, GrepTool
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.spawn import SpawnTool
@@ -37,7 +39,13 @@ from nanobot.utils.helpers import image_placeholder_text, truncate_text as trunc
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, OpenVikingConfig, WebToolsConfig
+    from nanobot.config.schema import (
+        ChannelsConfig,
+        ExecToolConfig,
+        OpenVikingConfig,
+        SkillsConfig,
+        WebToolsConfig,
+    )
     from nanobot.cron.service import CronService
 
 
@@ -145,6 +153,7 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         openviking_config: OpenVikingConfig | None = None,
+        skills_config: SkillsConfig | None = None,
         timezone: str | None = None,
         hooks: list[AgentHook] | None = None,
         unified_session: bool = False,
@@ -174,6 +183,7 @@ class AgentLoop:
         self.provider_retry_mode = provider_retry_mode
         self.web_config = web_config or WebToolsConfig()
         self.exec_config = exec_config or ExecToolConfig()
+        self.skills_config = skills_config or defaults.skills
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
         self._start_time = time.time()
@@ -228,6 +238,16 @@ class AgentLoop:
             provider=provider,
             model=self.model,
         )
+        self.skill_review: SkillReviewService | None = None
+        if self.skills_config.enabled and self.skills_config.review_enabled:
+            self.skill_review = SkillReviewService(
+                provider=provider,
+                workspace=workspace,
+                model=self.model,
+                config=self.skills_config,
+                provider_retry_mode=self.provider_retry_mode,
+                builtin_skills_dir=BUILTIN_SKILLS_DIR,
+            )
         self._register_default_tools()
         self.commands = CommandRouter()
         register_builtin_commands(self.commands)
@@ -253,6 +273,16 @@ class AgentLoop:
         if self.web_config.enable:
             self.tools.register(WebSearchTool(config=self.web_config.search, proxy=self.web_config.proxy))
             self.tools.register(WebFetchTool(proxy=self.web_config.proxy))
+        self.tools.register(SkillsListTool(workspace=self.workspace, builtin_skills_dir=BUILTIN_SKILLS_DIR))
+        self.tools.register(SkillViewTool(workspace=self.workspace, builtin_skills_dir=BUILTIN_SKILLS_DIR))
+        if self.skills_config.enabled:
+            self.tools.register(
+                SkillManageTool(
+                    workspace=self.workspace,
+                    builtin_skills_dir=BUILTIN_SKILLS_DIR,
+                    skills_config=self.skills_config,
+                )
+            )
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
         if self.cron_service:
@@ -543,6 +573,29 @@ class AgentLoop:
         self._background_tasks.append(task)
         task.add_done_callback(self._background_tasks.remove)
 
+    def _maybe_schedule_skill_review(
+        self,
+        *,
+        session_key: str,
+        msg: InboundMessage,
+        recent_messages: list[dict[str, Any]],
+        final_content: str,
+        stop_reason: str,
+    ) -> None:
+        if msg.channel == "system":
+            return
+        if self.skill_review is None:
+            return
+        self._schedule_background(
+            self.skill_review.review_turn(
+                session_key=session_key,
+                recent_messages=recent_messages,
+                final_content=final_content,
+                stop_reason=stop_reason,
+                user_message=msg.content,
+            )
+        )
+
     def stop(self) -> None:
         """Stop the agent loop."""
         self._running = False
@@ -639,10 +692,18 @@ class AgentLoop:
         if final_content is None or not final_content.strip():
             final_content = EMPTY_FINAL_RESPONSE_MESSAGE
 
+        before_turn_len = len(session.messages)
         self._save_turn(session, all_msgs, 1 + len(history))
         self._clear_runtime_checkpoint(session)
         self.sessions.save(session)
         self._schedule_background(self.consolidator.maybe_consolidate_by_tokens(session))
+        self._maybe_schedule_skill_review(
+            session_key=key,
+            msg=msg,
+            recent_messages=session.messages[before_turn_len:],
+            final_content=final_content,
+            stop_reason=stop_reason,
+        )
 
         if (mt := self.tools.get("message")) and isinstance(mt, MessageTool) and mt._sent_in_turn:
             return None

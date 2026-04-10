@@ -72,7 +72,7 @@ class TestConsolidatorTokenBudget:
         session.last_consolidated = 0
         session.messages = [{"role": "user", "content": "hi"}]
         session.key = "test:key"
-        consolidator.estimate_session_prompt_tokens = MagicMock(return_value=(100, "tiktoken"))
+        consolidator.estimate_session_prompt_tokens = AsyncMock(return_value=(100, "tiktoken"))
         consolidator.archive = AsyncMock(return_value=True)
         await consolidator.maybe_consolidate_by_tokens(session)
         consolidator.archive.assert_not_called()
@@ -90,7 +90,7 @@ class TestConsolidatorTokenBudget:
             }
             for i in range(70)
         ]
-        consolidator.estimate_session_prompt_tokens = MagicMock(
+        consolidator.estimate_session_prompt_tokens = AsyncMock(
             side_effect=[(1200, "tiktoken"), (400, "tiktoken")]
         )
         consolidator.pick_consolidation_boundary = MagicMock(return_value=(61, 999))
@@ -117,7 +117,7 @@ class TestConsolidatorTokenBudget:
             }
             for i in range(70)
         ]
-        consolidator.estimate_session_prompt_tokens = MagicMock(return_value=(1200, "tiktoken"))
+        consolidator.estimate_session_prompt_tokens = AsyncMock(return_value=(1200, "tiktoken"))
         consolidator.pick_consolidation_boundary = MagicMock(return_value=(61, 999))
         consolidator.archive = AsyncMock(return_value=True)
 

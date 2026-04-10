@@ -590,6 +590,7 @@ def serve(
         mcp_servers=runtime_config.tools.mcp_servers,
         channels_config=runtime_config.channels,
         openviking_config=runtime_config.openviking,
+        skills_config=runtime_config.agents.defaults.skills,
         timezone=runtime_config.agents.defaults.timezone,
         unified_session=runtime_config.agents.defaults.unified_session,
     )
@@ -683,6 +684,7 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         openviking_config=config.openviking,
+        skills_config=config.agents.defaults.skills,
         timezone=config.agents.defaults.timezone,
         unified_session=config.agents.defaults.unified_session,
     )
@@ -916,6 +918,7 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         openviking_config=config.openviking,
+        skills_config=config.agents.defaults.skills,
         timezone=config.agents.defaults.timezone,
         unified_session=config.agents.defaults.unified_session,
     )
@@ -1342,6 +1345,7 @@ def web(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         openviking_config=config.openviking,
+        skills_config=config.agents.defaults.skills,
         timezone=config.agents.defaults.timezone,
     )
 

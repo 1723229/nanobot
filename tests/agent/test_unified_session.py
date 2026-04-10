@@ -387,7 +387,7 @@ class TestConsolidationUnaffectedByUnifiedSession:
         session.messages = [{"role": "user", "content": "msg"}]
 
         # Simulate over-budget: estimated > budget
-        consolidator.estimate_session_prompt_tokens = MagicMock(return_value=(950, "tiktoken"))
+        consolidator.estimate_session_prompt_tokens = AsyncMock(return_value=(950, "tiktoken"))
         # No valid boundary found → returns gracefully without archiving
         consolidator.pick_consolidation_boundary = MagicMock(return_value=None)
         consolidator.archive = AsyncMock()

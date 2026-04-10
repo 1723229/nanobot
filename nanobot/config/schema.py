@@ -59,6 +59,22 @@ class DreamConfig(Base):
         return f"every {hours}h"
 
 
+class SkillsConfig(Base):
+    """Generated-skill and review-loop configuration."""
+
+    enabled: bool = True
+    generated_dir: str = ".agent-state/skills"
+    review_enabled: bool = False
+    review_mode: Literal["off", "suggest", "auto_update", "auto_create"] = "auto_update"
+    review_trigger_iterations: int = Field(default=8, ge=1)
+    review_min_tool_calls: int = Field(default=5, ge=0)
+    review_max_messages: int = Field(default=20, ge=1)
+    review_model_override: str | None = None
+    allow_create: bool = True
+    allow_patch: bool = True
+    allow_delete: bool = False
+
+
 class AgentDefaults(Base):
     """Default agent configuration."""
 
@@ -78,6 +94,7 @@ class AgentDefaults(Base):
     timezone: str = "UTC"  # IANA timezone, e.g. "Asia/Shanghai", "America/New_York"
     unified_session: bool = False  # Share one session across all channels (single-user multi-device)
     dream: DreamConfig = Field(default_factory=DreamConfig)
+    skills: SkillsConfig = Field(default_factory=SkillsConfig)
 
 
 class AgentsConfig(Base):

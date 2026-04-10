@@ -81,6 +81,7 @@ class Nanobot:
             restrict_to_workspace=config.tools.restrict_to_workspace,
             mcp_servers=config.tools.mcp_servers,
             openviking_config=config.openviking,
+            skills_config=defaults.skills,
             timezone=defaults.timezone,
             unified_session=defaults.unified_session,
         )
