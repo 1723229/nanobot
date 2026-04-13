@@ -31,12 +31,13 @@ class ContextBuilder:
     _MAX_RECENT_HISTORY = 50
     _VIKING_TIMEOUT = 5.0       # seconds before giving up on a Viking API call
     _PROFILE_CACHE_TTL = 300.0  # seconds to reuse a cached user profile
+    _RUNTIME_CONTEXT_END = "[/Runtime Context]"
 
-    def __init__(self, workspace: Path, timezone: str | None = None, viking_client: VikingClient | None = None):
+    def __init__(self, workspace: Path, timezone: str | None = None, disabled_skills: list[str] | None = None, viking_client: VikingClient | None = None)):
         self.workspace = workspace
         self.timezone = timezone
         self.memory = MemoryStore(workspace)
-        self.skills = SkillsLoader(workspace)
+        self.skills = SkillsLoader(workspace, disabled_skills=set(disabled_skills) if disabled_skills else None)
         self._viking_client = viking_client
         self._cached_profile: str | None = None
         self._profile_cache_time: float = 0.0
@@ -119,6 +120,7 @@ class ContextBuilder:
         channel: str | None,
         chat_id: str | None,
         timezone: str | None = None,
+        session_summary: str | None = None,
         sender_id: str | None = None,
         sender_name: str | None = None,
     ) -> str:
@@ -130,7 +132,9 @@ class ContextBuilder:
             lines.append(f"Sender ID: {sender_id}")
         if sender_name:
             lines.append(f"Sender Name: {sender_name}")
-        return ContextBuilder._RUNTIME_CONTEXT_TAG + "\n" + "\n".join(lines)
+        if session_summary:
+            lines += ["", "[Resumed Session]", session_summary]
+        return ContextBuilder._RUNTIME_CONTEXT_TAG + "\n" + "\n".join(lines) + "\n" + ContextBuilder._RUNTIME_CONTEXT_END
 
     @staticmethod
     def _merge_message_content(left: Any, right: Any) -> str | list[dict[str, Any]]:
@@ -169,9 +173,10 @@ class ContextBuilder:
         sender_id: str | None = None,
         sender_name: str | None = None,
         current_role: str = "user",
+        session_summary: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
-        runtime_ctx = self._build_runtime_context(channel, chat_id, self.timezone, sender_id, sender_name)
+        runtime_ctx = self._build_runtime_context(channel, chat_id, self.timezone, session_summary=session_summary, sender_id, sender_name)
         user_content = self._build_user_content(current_message, media)
 
         if isinstance(user_content, str):
