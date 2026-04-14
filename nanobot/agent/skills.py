@@ -111,6 +111,7 @@ class SkillsLoader:
             skills = [s for s in skills if s["name"] not in self.disabled_skills]
 
         skills = [s for s in skills if self._should_keep_for_channel(s["name"], channel)]
+        skills = [s for s in skills if self._skill_is_readable(s["name"])]
 
         if filter_unavailable:
             return [skill for skill in skills if self._check_requirements(self._get_skill_meta(skill["name"]))]
@@ -144,7 +145,7 @@ class SkillsLoader:
         for root in roots:
             path = root / name / "SKILL.md"
             if path.exists():
-                return path.read_text(encoding="utf-8")
+                return self._read_skill_file(path)
         return None
 
     def load_skills_for_context(self, skill_names: list[str]) -> str:

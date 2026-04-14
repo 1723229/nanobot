@@ -429,3 +429,22 @@ def test_channel_filter_applies_to_always_skills(tmp_path: Path) -> None:
     always = sorted(loader.get_always_skills(channel="feishu"))
 
     assert always == ["lark-doc", "memory"]
+
+
+def test_invalid_utf8_skill_is_skipped_without_crashing(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    ws_skills = workspace / "skills"
+    ws_skills.mkdir(parents=True)
+    _write_skill(ws_skills, "good", metadata_json={"always": True}, body="# Good")
+    bad_dir = ws_skills / "bad"
+    bad_dir.mkdir(parents=True)
+    (bad_dir / "SKILL.md").write_bytes(b"---\nmetadata: x\n---\n\n\xA1\xA1")
+    builtin = tmp_path / "builtin"
+    builtin.mkdir()
+
+    loader = SkillsLoader(workspace, builtin_skills_dir=builtin)
+
+    entries = loader.list_skills(filter_unavailable=False)
+    assert [entry["name"] for entry in entries] == ["good"]
+    assert loader.get_skill_metadata("bad") is None
+    assert loader.get_always_skills() == ["good"]
