@@ -173,7 +173,7 @@ lark-cli mail +draft-edit --draft-id <draft_id> --patch-file ./patch.json
 
 ## 注意事项
 
-- 需要已登录（`lark-cli auth login --scope "mail:user_mailbox.message:modify mail:user_mailbox.message:readonly mail:user_mailbox:readonly"`）且具备写/读邮件权限
+- 需要具备写/读邮件权限；如用户授权缺失或过期，由 agent 在后台发起 `lark-cli auth login --scope "mail:user_mailbox.message:modify mail:user_mailbox.message:readonly mail:user_mailbox:readonly"` 并返回授权链接，不要让最终用户执行该命令
 - 邮件 ID 可从 `lark-cli mail user_mailbox.messages list` 获取
 - `--bcc` 仅在发送链路中生效，通常不会在收件方看到
 

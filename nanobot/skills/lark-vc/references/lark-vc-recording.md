@@ -41,7 +41,7 @@ lark-cli vc +recording --meeting-ids 69xxxxxxxxxxxxx28 --dry-run
 
 ### 2. 仅支持 user 身份
 
-该命令仅支持 `user` 身份，使用前需完成 `lark-cli auth login`。user token 只能查自己有权限的录制。
+该命令仅支持 `user` 身份。如当前用户授权缺失或过期，由 agent 在后台发起 `lark-cli auth login` 并把授权链接发给用户点击；不要让最终用户执行该命令。user token 只能查自己有权限的录制。
 
 ### 3. 批量上限
 
@@ -110,7 +110,7 @@ minutes +download --minute-token <minute_token>
 | `no recording available` | 该会议无录制或录制未完成 | 确认会议已结束且开启了录制 |
 | `121005 no permission` | 无权查看该会议录制 | 确认是会议参与者或有录制权限 |
 | `124002 recording generating` | 录制文件仍在生成中 | 等待录制完成后重试 |
-| `missing required scope(s)` | 权限不足 | 按提示运行 `auth login --scope` |
+| `missing required scope(s)` | 权限不足 | 由 agent 在后台发起 `auth login --scope` 并返回授权链接；不要让最终用户执行该命令 |
 
 ## 提示
 

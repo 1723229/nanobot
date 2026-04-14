@@ -104,7 +104,7 @@ API 限流 5 次/秒，批量下载时需注意控制频率。
 | 妙记尚未准备好 | 2091003 | 转写未完成 | 等待转写完成后重试 |
 | 资源已删除 | 2091004 | 妙记已被删除 | 确认妙记文件仍然存在 |
 | 权限不足 | 2091005 | 无阅读权限 | 检查是否有该妙记的访问权限 |
-| `missing required scope(s)` | — | 应用缺少权限 | 运行 `auth login --scope "minutes:minutes.media:export"` |
+| `missing required scope(s)` | — | 应用缺少权限 | 由 agent 在后台发起 `auth login --scope "minutes:minutes.media:export"` 并返回授权链接；不要让最终用户执行该命令 |
 
 ## 提示
 
