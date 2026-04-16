@@ -1401,7 +1401,7 @@ class FeishuChannel(BaseChannel):
         # --- stream end: final update or fallback ---
         if meta.get("_stream_end"):
             if (message_id := meta.get("message_id")) and (reaction_id := meta.get("reaction_id")):
-                await self._remove_reaction(message_id, reaction_id)
+                # await self._remove_reaction(message_id, reaction_id)
                 # Add completion emoji if configured
                 if self.config.done_emoji and message_id:
                     await self._add_reaction(message_id, self.config.done_emoji)
