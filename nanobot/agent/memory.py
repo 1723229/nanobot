@@ -603,12 +603,12 @@ class Dream:
 
     def _build_tools(self) -> ToolRegistry:
         """Build a minimal tool registry for the Dream agent."""
+        from nanobot.agent.skill_evo.integration import build_dream_skill_tools
         from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-        from nanobot.agent.tools.filesystem import EditFileTool, ReadFileTool, WriteFileTool
+        from nanobot.agent.tools.filesystem import EditFileTool, ReadFileTool
 
         tools = ToolRegistry()
         workspace = self.store.workspace
-        # Allow reading builtin skills for reference during skill creation
         extra_read = [BUILTIN_SKILLS_DIR] if BUILTIN_SKILLS_DIR.exists() else None
         tools.register(ReadFileTool(
             workspace=workspace,
@@ -616,11 +616,12 @@ class Dream:
             extra_allowed_dirs=extra_read,
         ))
         tools.register(EditFileTool(workspace=workspace, allowed_dir=workspace))
-        # write_file resolves relative paths from workspace root, but can only
-        # write under skills/ so the prompt can safely use skills/<name>/SKILL.md.
-        skills_dir = workspace / "skills"
-        skills_dir.mkdir(parents=True, exist_ok=True)
-        tools.register(WriteFileTool(workspace=workspace, allowed_dir=skills_dir))
+
+        skill_tools = build_dream_skill_tools(workspace)
+        for name in skill_tools.tool_names:
+            tool = skill_tools.get(name)
+            if tool is not None:
+                tools.register(tool)
         return tools
 
     # -- skill listing --------------------------------------------------------

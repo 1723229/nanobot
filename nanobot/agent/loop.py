@@ -157,10 +157,12 @@ class AgentLoop:
         hooks: list[AgentHook] | None = None,
         unified_session: bool = False,
         disabled_skills: list[str] | None = None,
+        skills_config: Any | None = None,
     ):
-        from nanobot.config.schema import ExecToolConfig, WebToolsConfig
+        from nanobot.config.schema import ExecToolConfig, SkillsConfig, WebToolsConfig
 
         defaults = AgentDefaults()
+        self.skills_config = skills_config or SkillsConfig()
         self.bus = bus
         self.channels_config = channels_config
         self.provider = provider
@@ -248,6 +250,14 @@ class AgentLoop:
             model=self.model,
         )
         self._register_default_tools()
+
+        from nanobot.agent.skill_evo.integration import SkillReviewTracker, create_review_service
+        review_svc = create_review_service(
+            provider, self.model, getattr(self, "_skill_store", None),
+            self.context.skills, self.skills_config,
+        )
+        self._skill_tracker = SkillReviewTracker(self.skills_config, review_svc)
+
         self.commands = CommandRouter()
         register_builtin_commands(self.commands)
 
@@ -289,6 +299,11 @@ class AgentLoop:
             self.tools.register(
                 CronTool(self.cron_service, default_timezone=self.context.timezone or "UTC")
             )
+
+        from nanobot.agent.skill_evo.integration import register_skill_tools
+        self._skill_store = register_skill_tools(
+            self.tools, self.context.skills, self.workspace, self.skills_config,
+        )
 
         if self.openviking_config and self.openviking_config.enabled:
             self._register_openviking_tools()
@@ -794,7 +809,7 @@ class AgentLoop:
             self.sessions.save(session)
             user_persisted_early = True
 
-        final_content, _, all_msgs, stop_reason, had_injections = await self._run_agent_loop(
+        final_content, tools_used, all_msgs, stop_reason, had_injections = await self._run_agent_loop(
             initial_messages,
             on_progress=on_progress or _bus_progress,
             on_stream=on_stream,
@@ -816,6 +831,15 @@ class AgentLoop:
         self._clear_runtime_checkpoint(session)
         self.sessions.save(session)
         self._schedule_background(self.consolidator.maybe_consolidate_by_tokens(session))
+
+        if self._skill_tracker.active:
+            self._schedule_background(
+                self._skill_tracker.maybe_review(
+                    all_msgs, key,
+                    set(tools_used) if tools_used else set(),
+                    bus=self.bus, channel=msg.channel, chat_id=msg.chat_id,
+                )
+            )
 
         # When follow-up messages were injected mid-turn, a later natural
         # language reply may address those follow-ups and should not be

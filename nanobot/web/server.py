@@ -136,6 +136,7 @@ def create_app(
             channels_config=config.channels,
             openviking_config=config.openviking,
             timezone=config.agents.defaults.timezone,
+            skills_config=config.agents.defaults.skills,
         )
         app.state.agent = agent
     else:
@@ -578,7 +579,12 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/api/skills/upload")
     async def upload_skill(file: UploadFile = File(...)):
-        """Upload a skill as a zip file."""
+        """Upload a skill as a zip file with security hardening."""
+        from nanobot.agent.skill_evo.integration import (
+            check_zip_path_traversal,
+            validate_upload_zip,
+            validate_uploaded_skill,
+        )
         from nanobot.agent.skills import SkillsLoader
 
         config: Config = app.state.config
@@ -588,54 +594,61 @@ def _register_routes(app: FastAPI) -> None:
             raise HTTPException(status_code=400, detail="File must be a .zip archive")
 
         import tempfile
+        content = await file.read()
+        if err := validate_upload_zip(content):
+            raise HTTPException(status_code=400, detail=err)
+
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = Path(tmp.name)
 
         try:
             with zipfile.ZipFile(tmp_path, "r") as zf:
                 names = zf.namelist()
-                # Find SKILL.md — could be at root or inside a single top-level dir
                 skill_md_entries = [n for n in names if n.endswith("SKILL.md")]
                 if not skill_md_entries:
                     raise HTTPException(status_code=400, detail="Zip must contain a SKILL.md file")
 
-                # Determine skill name and extraction
                 skill_md = skill_md_entries[0]
                 parts = skill_md.split("/")
                 if len(parts) == 1:
-                    # SKILL.md at root — use zip filename as skill name
                     skill_name = file.filename.rsplit(".", 1)[0]
                 else:
-                    # SKILL.md inside a directory — use that directory name
                     skill_name = parts[0]
 
                 target_dir = loader.workspace_skills / skill_name
                 target_dir.mkdir(parents=True, exist_ok=True)
 
                 if len(parts) == 1:
-                    # Extract everything to skill_name/
+                    for member in names:
+                        if err := check_zip_path_traversal(member, target_dir):
+                            raise HTTPException(status_code=400, detail=err)
                     zf.extractall(target_dir)
                 else:
-                    # Extract contents of the top-level dir
                     prefix = skill_name + "/"
                     for member in names:
-                        if member.startswith(prefix):
-                            rel = member[len(prefix):]
-                            if not rel:
-                                continue
-                            dest = target_dir / rel
-                            if member.endswith("/"):
-                                dest.mkdir(parents=True, exist_ok=True)
-                            else:
-                                dest.parent.mkdir(parents=True, exist_ok=True)
-                                with zf.open(member) as src, open(dest, "wb") as dst:
-                                    dst.write(src.read())
+                        if not member.startswith(prefix):
+                            continue
+                        rel = member[len(prefix):]
+                        if not rel:
+                            continue
+                        if err := check_zip_path_traversal(rel, target_dir):
+                            raise HTTPException(status_code=400, detail=err)
+                        dest = target_dir / rel
+                        if member.endswith("/"):
+                            dest.mkdir(parents=True, exist_ok=True)
+                        else:
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            with zf.open(member) as src, open(dest, "wb") as dst:
+                                dst.write(src.read())
+
+                if err := validate_uploaded_skill(target_dir):
+                    import shutil
+                    shutil.rmtree(str(target_dir), ignore_errors=True)
+                    raise HTTPException(status_code=400, detail=err)
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        # Return the newly created skill info
         meta = loader.get_skill_metadata(skill_name) or {}
         available = loader._check_requirements(loader._get_skill_meta(skill_name))
         return {
