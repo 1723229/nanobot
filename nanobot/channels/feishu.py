@@ -77,15 +77,29 @@ def _extract_interactive_content(content: dict) -> list[str]:
         elif isinstance(title, str):
             parts.append(f"title: {title}")
 
-    for elements in (
-        content.get("elements", []) if isinstance(content.get("elements"), list) else []
-    ):
+    elements = content.get("elements", [])
+    if isinstance(elements, list):
         for element in elements:
-            parts.extend(_extract_element_content(element))
+            if isinstance(element, dict):
+                parts.extend(_extract_element_content(element))
+            elif isinstance(element, list):
+                for nested in element:
+                    parts.extend(_extract_element_content(nested))
 
     card = content.get("card", {})
     if card:
         parts.extend(_extract_interactive_content(card))
+
+    body = content.get("body", {})
+    if body:
+        parts.extend(_extract_interactive_content(body))
+
+    data = content.get("data", {})
+    if isinstance(data, dict) and data:
+        if card_id := data.get("card_id"):
+            parts.append(f"[interactive card: {card_id}]")
+        else:
+            parts.extend(_extract_interactive_content(data))
 
     header = content.get("header", {})
     if header:
@@ -163,6 +177,11 @@ def _extract_element_content(element: dict) -> list[str]:
         content = element.get("content", "")
         if content:
             parts.append(content)
+
+    elif tag == "text":
+        text = element.get("text", "")
+        if text:
+            parts.append(text)
 
     else:
         for ne in element.get("elements", []):
@@ -251,7 +270,7 @@ class FeishuConfig(Base):
     encrypt_key: str = ""
     verification_token: str = ""
     allow_from: list[str] = Field(default_factory=list)
-    react_emoji: str = "THUMBSUP"
+    react_emoji: str = "OK"
     done_emoji: str | None = None  # Emoji to show when task is completed (e.g., "DONE", "OK")
     tool_hint_prefix: str = "\U0001f527"  # Prefix for inline tool hints (default: 🔧)
     group_policy: Literal["open", "mention"] = "mention"
@@ -306,6 +325,7 @@ class FeishuChannel(BaseChannel):
         self._ws_thread: threading.Thread | None = None
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._user_name_cache: dict[str, tuple[str, float]] = {}  # open_id -> (name, cached_at)
         self._stream_bufs: dict[str, _FeishuStreamBuf] = {}
         self._bot_open_id: str | None = None
 
@@ -548,7 +568,7 @@ class FeishuChannel(BaseChannel):
             logger.warning("Error adding reaction: {}", e)
             return None
 
-    async def _add_reaction(self, message_id: str, emoji_type: str = "THUMBSUP") -> str | None:
+    async def _add_reaction(self, message_id: str, emoji_type: str = "OK") -> str | None:
         """
         Add a reaction emoji to a message (non-blocking).
 
@@ -667,6 +687,19 @@ class FeishuChannel(BaseChannel):
         if remaining.strip():
             elements.extend(self._split_headings(remaining))
         return elements or [{"tag": "markdown", "content": content}]
+
+    def _build_single_card_elements(self, content: str) -> list[dict]:
+        """Build elements for a single Feishu card.
+
+        Feishu native cards allow only one table element. When the rendered
+        markdown would produce multiple tables, fall back to a single markdown
+        block so the whole message still fits in one card.
+        """
+        elements = self._build_card_elements(content)
+        table_count = sum(1 for el in elements if el.get("tag") == "table")
+        if table_count > 1:
+            return [{"tag": "markdown", "content": content}]
+        return elements
 
     @staticmethod
     def _split_elements_by_table_limit(
@@ -1053,6 +1086,42 @@ class FeishuChannel(BaseChannel):
         return None, f"[{msg_type}: download failed]"
 
     _REPLY_CONTEXT_MAX_LEN = 200
+    _USER_NAME_FAILURE_TTL = 60.0
+
+    @staticmethod
+    def _extract_message_text(msg_type: str, content_json: Any) -> str:
+        """Extract plain-text context from a fetched Feishu message payload."""
+        if isinstance(content_json, str):
+            try:
+                content_json = json.loads(content_json)
+            except (json.JSONDecodeError, TypeError):
+                return content_json
+
+        if msg_type == "text" and isinstance(content_json, dict):
+            return str(content_json.get("text", "")).strip()
+
+        if msg_type == "post":
+            return _extract_post_text(content_json).strip()
+
+        if msg_type == "interactive":
+            return "\n".join(_extract_interactive_content(content_json)).strip()
+
+        if msg_type in (
+            "share_chat",
+            "share_user",
+            "share_calendar_event",
+            "system",
+            "merge_forward",
+        ):
+            return _extract_share_card_content(content_json, msg_type).strip()
+
+        if msg_type in MSG_TYPE_MAP:
+            return MSG_TYPE_MAP[msg_type]
+
+        if msg_type in ("media", "video"):
+            return f"[{msg_type}]"
+
+        return f"[{msg_type}]" if msg_type else ""
 
     def _get_message_content_sync(self, message_id: str) -> str | None:
         """Fetch the text content of a Feishu message by ID (synchronous).
@@ -1080,18 +1149,11 @@ class FeishuChannel(BaseChannel):
             raw_content = getattr(raw_content, "content", None) if raw_content else None
             if not raw_content:
                 return None
-            try:
-                content_json = json.loads(raw_content)
-            except (json.JSONDecodeError, TypeError):
-                return None
             msg_type = getattr(msg_obj, "msg_type", "")
-            if msg_type == "text":
-                text = content_json.get("text", "").strip()
-            elif msg_type == "post":
-                text, _ = _extract_post_content(content_json)
-                text = text.strip()
-            else:
-                text = ""
+            text = self._extract_message_text(msg_type, raw_content)
+            mentions = getattr(msg_obj, "mentions", None) or None
+            if mentions:
+                text = self._resolve_parent_mentions(text, mentions)
             if not text:
                 return None
             if len(text) > self._REPLY_CONTEXT_MAX_LEN:
@@ -1100,6 +1162,42 @@ class FeishuChannel(BaseChannel):
         except Exception as e:
             logger.debug("Feishu: error fetching parent message {}: {}", message_id, e)
             return None
+
+    def _resolve_parent_mentions(self, text: str, mentions: list[Any] | None) -> str:
+        """Resolve @mentions in fetched parent messages.
+
+        ``message.get`` returns mention items in a different shape from inbound
+        webhook events, so we normalize both structures here.
+        """
+        if not mentions or not text:
+            return text
+
+        for mention in mentions:
+            key = getattr(mention, "key", None) or None
+            if not key or key not in text:
+                continue
+
+            mention_id = getattr(mention, "id", None) or None
+            open_id = ""
+            user_id = ""
+            if isinstance(mention_id, str):
+                open_id = mention_id
+            else:
+                open_id = getattr(mention_id, "open_id", None) or ""
+                user_id = getattr(mention_id, "user_id", None) or ""
+
+            name = getattr(mention, "name", None) or key
+
+            if open_id and user_id:
+                replacement = f"@{name} ({open_id}, user id: {user_id})"
+            elif open_id:
+                replacement = f"@{name} ({open_id})"
+            else:
+                replacement = f"@{name}"
+
+            text = text.replace(key, replacement)
+
+        return text
 
     def _reply_message_sync(self, parent_message_id: str, msg_type: str, content: str) -> bool:
         """Reply to an existing Feishu message using the Reply API (synchronous)."""
@@ -1303,7 +1401,7 @@ class FeishuChannel(BaseChannel):
         # --- stream end: final update or fallback ---
         if meta.get("_stream_end"):
             if (message_id := meta.get("message_id")) and (reaction_id := meta.get("reaction_id")):
-                await self._remove_reaction(message_id, reaction_id)
+                # await self._remove_reaction(message_id, reaction_id)
                 # Add completion emoji if configured
                 if self.config.done_emoji and message_id:
                     await self._add_reaction(message_id, self.config.done_emoji)
@@ -1336,16 +1434,16 @@ class FeishuChannel(BaseChannel):
                     "Streaming card {} final update failed, falling back to regular card",
                     buf.card_id,
                 )
-            for chunk in self._split_elements_by_table_limit(
-                self._build_card_elements(buf.text)
-            ):
-                card = json.dumps(
-                    {"config": {"wide_screen_mode": True}, "elements": chunk},
-                    ensure_ascii=False,
-                )
-                await loop.run_in_executor(
-                    None, self._send_message_sync, rid_type, chat_id, "interactive", card
-                )
+            card = json.dumps(
+                {
+                    "config": {"wide_screen_mode": True},
+                    "elements": self._build_single_card_elements(buf.text),
+                },
+                ensure_ascii=False,
+            )
+            await loop.run_in_executor(
+                None, self._send_message_sync, rid_type, chat_id, "interactive", card
+            )
             return
 
         # --- accumulate delta ---
@@ -1488,15 +1586,16 @@ class FeishuChannel(BaseChannel):
 
                 else:
                     # Complex / long content – send as interactive card
-                    elements = self._build_card_elements(msg.content)
-                    for chunk in self._split_elements_by_table_limit(elements):
-                        card = {"config": {"wide_screen_mode": True}, "elements": chunk}
-                        await loop.run_in_executor(
-                            None,
-                            _do_send,
-                            "interactive",
-                            json.dumps(card, ensure_ascii=False),
-                        )
+                    card = {
+                        "config": {"wide_screen_mode": True},
+                        "elements": self._build_single_card_elements(msg.content),
+                    }
+                    await loop.run_in_executor(
+                        None,
+                        _do_send,
+                        "interactive",
+                        json.dumps(card, ensure_ascii=False),
+                    )
 
         except Exception as e:
             logger.error("Error sending Feishu message: {}", e)
@@ -1539,9 +1638,15 @@ class FeishuChannel(BaseChannel):
             chat_type = message.chat_type
             msg_type = message.message_type
 
+            loop = asyncio.get_running_loop()
+
             if chat_type == "group" and not self._is_group_message_for_bot(message):
                 logger.debug("Feishu: skipping group message (not mentioned)")
                 return
+
+            sender_name = await loop.run_in_executor(
+                None, self._get_user_name_sync, sender_id,
+            ) if sender_id != "unknown" else ""
 
             # Add reaction
             reaction_id = await self._add_reaction(message_id, self.config.react_emoji)
@@ -1598,7 +1703,7 @@ class FeishuChannel(BaseChannel):
                 "merge_forward",
             ):
                 # Handle share cards and interactive messages
-                text = _extract_share_card_content(content_json, msg_type)
+                text = self._extract_message_text(msg_type, content_json)
                 if text:
                     content_parts.append(text)
 
@@ -1636,6 +1741,8 @@ class FeishuChannel(BaseChannel):
                     "reaction_id": reaction_id,
                     "chat_type": chat_type,
                     "msg_type": msg_type,
+                    "sender_name": sender_name,
+                    "sender_open_id": sender_id,
                     "parent_id": parent_id,
                     "root_id": root_id,
                     "thread_id": thread_id,
@@ -1714,3 +1821,31 @@ class FeishuChannel(BaseChannel):
         return "\n".join(
             f"{self.config.tool_hint_prefix} {ln}" for ln in lines if ln.strip()
         )
+
+    def _get_user_name_sync(self, open_id: str) -> str:
+        """Look up a user's display name by open_id via Contact API, with in-memory cache.
+
+        Successful lookups are cached indefinitely for the session lifetime.
+        Failed lookups are cached for _USER_NAME_FAILURE_TTL seconds so that
+        transient API errors do not permanently suppress the user's display name.
+        """
+        cached = self._user_name_cache.get(open_id)
+        if cached is not None:
+            name, cached_at = cached
+            if name or (time.monotonic() - cached_at < self._USER_NAME_FAILURE_TTL):
+                return name
+        try:
+            from lark_oapi.api.contact.v3 import GetUserRequest as ContactGetUserRequest
+            request = ContactGetUserRequest.builder() \
+                .user_id(open_id) \
+                .user_id_type("open_id") \
+                .build()
+            response = self._client.contact.v3.user.get(request)
+            if response.success() and response.data and response.data.user:
+                name = response.data.user.name or ""
+                self._user_name_cache[open_id] = (name, time.monotonic())
+                return name
+        except Exception as e:
+            logger.debug("Failed to fetch user name for {}: {}", open_id, e)
+        self._user_name_cache[open_id] = ("", time.monotonic())
+        return ""
