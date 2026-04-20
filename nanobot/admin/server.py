@@ -1,4 +1,4 @@
-"""FastAPI web server for nanobot frontend."""
+"""FastAPI admin server for the standalone HTTP/WebSocket interface."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from nanobot.cron.types import CronSchedule, CronJob
 from nanobot.providers.registry import PROVIDERS
 
 if TYPE_CHECKING:
-    from nanobot.channels.web import WebChannel
+    from nanobot.channels.admin import AdminChannel
 
 
 # ============================================================================
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: str = "web:default"
+    session_id: str = "admin:default"
     attachments: list[dict[str, str]] | None = None
 
 
@@ -68,7 +68,7 @@ class ToggleCronJobRequest(BaseModel):
 def create_app(
     *,
     bus: MessageBus | None = None,
-    web_channel: "WebChannel | None" = None,
+    admin_channel: "AdminChannel | None" = None,
     session_manager: SessionManager | None = None,
     config: Config | None = None,
     cron_service: CronService | None = None,
@@ -77,7 +77,7 @@ def create_app(
 
     Two modes:
     - **Gateway mode** (bus + web_channel provided): messages go through the
-      MessageBus; the WebChannel's ``_handle_message`` publishes inbound
+      MessageBus; the AdminChannel's ``_handle_message`` publishes inbound
       messages and the AgentLoop processes them asynchronously.
     - **Standalone mode** (no bus): creates its own AgentLoop and uses
       ``process_direct()`` for synchronous request-response (legacy).
@@ -152,7 +152,7 @@ def create_app(
     app.state.session_manager = session_manager
     app.state.cron_service = cron_service
     app.state.bus = bus
-    app.state.web_channel = web_channel  # may be None in standalone
+    app.state.admin_channel = admin_channel  # may be None in standalone
 
     _register_routes(app)
     return app
@@ -188,18 +188,18 @@ def _register_routes(app: FastAPI) -> None:
         # Resolve attachment file paths
         media_paths: list[str] = []
         if req.attachments:
-            from nanobot.web.files import get_file_path
+            from nanobot.admin.files import get_file_path
             config_ref: Config = app.state.config
             for att in req.attachments:
                 fpath = get_file_path(config_ref.workspace_path, att.get("file_id", ""))
                 if fpath:
                     media_paths.append(str(fpath))
 
-        web_channel: "WebChannel | None" = app.state.web_channel
+        admin_channel: "AdminChannel | None" = app.state.admin_channel
 
-        if web_channel is not None:
+        if admin_channel is not None:
             # Gateway mode – async via bus
-            await web_channel._handle_message(
+            await admin_channel._handle_message(
                 sender_id="web_user",
                 chat_id=chat_id,
                 content=req.message,
@@ -207,7 +207,7 @@ def _register_routes(app: FastAPI) -> None:
                 metadata={"attachments": req.attachments} if req.attachments else None,
             )
             # Notify connected clients that processing started
-            await web_channel.notify_thinking(chat_id)
+            await admin_channel.notify_thinking(chat_id)
             return {"status": "accepted", "session_id": session_key}
         else:
             # Standalone fallback
@@ -217,7 +217,7 @@ def _register_routes(app: FastAPI) -> None:
             response_msg = await agent.process_direct(
                 content=req.message,
                 session_key=session_key,
-                channel="web",
+                channel="admin",
                 chat_id=chat_id,
             )
             response = response_msg.content if response_msg else ""
@@ -243,7 +243,7 @@ def _register_routes(app: FastAPI) -> None:
                 response_msg = await agent.process_direct(
                     content=req.message,
                     session_key=session_key,
-                    channel="web",
+                    channel="admin",
                     chat_id=session_key.split(":", 1)[-1] if ":" in session_key else session_key,
                 )
                 response = response_msg.content if response_msg else ""
@@ -268,12 +268,12 @@ def _register_routes(app: FastAPI) -> None:
         Server sends: {"type":"message","role":"assistant","content":"..."}
                       {"type":"status","status":"thinking"}
         """
-        web_channel: "WebChannel | None" = app.state.web_channel
+        admin_channel: "AdminChannel | None" = app.state.admin_channel
 
         await websocket.accept()
 
-        if web_channel is not None:
-            web_channel.register_connection(session_id, websocket)
+        if admin_channel is not None:
+            admin_channel.register_connection(session_id, websocket)
 
         try:
             while True:
@@ -296,33 +296,33 @@ def _register_routes(app: FastAPI) -> None:
                     attachments = data.get("attachments") or []
                     media_paths: list[str] = []
                     if attachments:
-                        from nanobot.web.files import get_file_path
+                        from nanobot.admin.files import get_file_path
                         config_ref: Config = app.state.config
                         for att in attachments:
                             fpath = get_file_path(config_ref.workspace_path, att.get("file_id", ""))
                             if fpath:
                                 media_paths.append(str(fpath))
 
-                    if web_channel is not None:
+                    if admin_channel is not None:
                         # Gateway mode – publish via bus
-                        await web_channel._handle_message(
+                        await admin_channel._handle_message(
                             sender_id="web_user",
                             chat_id=session_id,
                             content=content,
                             media=media_paths or None,
                             metadata={"attachments": attachments} if attachments else None,
                         )
-                        await web_channel.notify_thinking(session_id)
+                        await admin_channel.notify_thinking(session_id)
                     else:
                         # Standalone fallback — process directly
                         from nanobot.agent.loop import AgentLoop
 
                         agent: AgentLoop = app.state.agent
-                        session_key = f"web:{session_id}"
+                        session_key = f"admin:{session_id}"
                         response_msg = await agent.process_direct(
                             content=content,
                             session_key=session_key,
-                            channel="web",
+                            channel="admin",
                             chat_id=session_id,
                         )
                         response = response_msg.content if response_msg else ""
@@ -337,8 +337,8 @@ def _register_routes(app: FastAPI) -> None:
         except Exception as e:
             logger.error(f"WebSocket error for session {session_id}: {e}")
         finally:
-            if web_channel is not None:
-                web_channel.unregister_connection(session_id, websocket)
+            if admin_channel is not None:
+                admin_channel.unregister_connection(session_id, websocket)
 
     # ------ Sessions ------
 
@@ -418,7 +418,7 @@ def _register_routes(app: FastAPI) -> None:
                 })
 
         channels_status = []
-        for ch_name in ["whatsapp", "telegram", "discord", "feishu", "dingtalk", "email", "slack", "qq", "web"]:
+        for ch_name in ["whatsapp", "telegram", "discord", "feishu", "dingtalk", "email", "slack", "qq", "admin"]:
             ch_cfg = getattr(config.channels, ch_name, None)
             if ch_cfg:
                 channels_status.append({
@@ -666,10 +666,10 @@ def _register_routes(app: FastAPI) -> None:
     @app.post("/api/files/upload")
     async def upload_file(
         file: UploadFile = File(...),
-        session_id: str = Form("web:default"),
+        session_id: str = Form("admin:default"),
     ):
         """Upload a file for chat attachment or analysis."""
-        from nanobot.web.files import save_file, generate_file_id
+        from nanobot.admin.files import save_file, generate_file_id
 
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
@@ -695,7 +695,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/files")
     async def list_uploaded_files(session_id: str | None = None):
         """List uploaded files, optionally filtered by session."""
-        from nanobot.web.files import list_files
+        from nanobot.admin.files import list_files
 
         config: Config = app.state.config
         return list_files(config.workspace_path, session_id=session_id)
@@ -703,7 +703,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/files/{file_id}")
     async def download_file(file_id: str):
         """Download a file by ID."""
-        from nanobot.web.files import get_file_metadata, get_file_path
+        from nanobot.admin.files import get_file_metadata, get_file_path
 
         config: Config = app.state.config
         meta = get_file_metadata(config.workspace_path, file_id)
@@ -728,7 +728,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.delete("/api/files/{file_id}")
     async def remove_file(file_id: str):
         """Delete a file."""
-        from nanobot.web.files import delete_file
+        from nanobot.admin.files import delete_file
 
         config: Config = app.state.config
         if delete_file(config.workspace_path, file_id):

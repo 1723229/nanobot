@@ -79,7 +79,7 @@ class ChannelManager:
             if not enabled:
                 continue
             try:
-                if name == "web":
+                if name == "admin":
                     channel = cls(
                         section,
                         self.bus,

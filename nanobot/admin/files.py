@@ -1,4 +1,4 @@
-"""File storage helpers for the web API."""
+"""File storage helpers for the admin API."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def save_file(
     filename: str,
     content: bytes,
     content_type: str,
-    session_id: str = "web:default",
+    session_id: str = "admin:default",
 ) -> dict[str, Any]:
     """Save a file to workspace/files/<file_id>/ and write metadata.json."""
     if not _is_safe_filename(filename):

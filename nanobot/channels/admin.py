@@ -1,4 +1,4 @@
-"""Web channel with WebSocket support for real-time browser communication."""
+"""Standalone admin channel with WebSocket support for real-time clients."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
-from nanobot.config.schema import WebConfig
+from nanobot.config.schema import AdminConfig
 
 if TYPE_CHECKING:
     from nanobot.session.manager import SessionManager
@@ -20,9 +20,9 @@ if TYPE_CHECKING:
     from nanobot.cron.service import CronService
 
 
-class WebChannel(BaseChannel):
+class AdminChannel(BaseChannel):
     """
-    Web channel that serves a FastAPI app with WebSocket endpoints.
+    Admin channel that serves a FastAPI app with HTTP and WebSocket endpoints.
 
     Messages flow through the MessageBus like all other channels:
     - Browser sends via WebSocket -> _handle_message() -> bus.inbound
@@ -30,12 +30,12 @@ class WebChannel(BaseChannel):
     - If browser is disconnected, send() is a no-op (session is already persisted).
     """
 
-    name = "web"
-    display_name = "Web"
+    name = "admin"
+    display_name = "Admin"
 
     def __init__(
         self,
-        config: WebConfig,
+        config: AdminConfig,
         bus: MessageBus,
         session_manager: "SessionManager | None" = None,
         full_config: "Config | None" = None,
@@ -52,7 +52,7 @@ class WebChannel(BaseChannel):
     async def start(self) -> None:
         """Start the FastAPI/uvicorn server as an async task."""
         self._running = True
-        logger.info(f"Web channel starting on {self.config.host}:{self.config.port}")
+        logger.info(f"Admin channel starting on {self.config.host}:{self.config.port}")
 
         try:
             import uvicorn
@@ -61,11 +61,11 @@ class WebChannel(BaseChannel):
             self._running = False
             return
 
-        from nanobot.web.server import create_app
+        from nanobot.admin.server import create_app
 
         app = create_app(
             bus=self.bus,
-            web_channel=self,
+            admin_channel=self,
             session_manager=self.session_manager,
             config=self.full_config,
             cron_service=self.cron_service,
@@ -95,7 +95,7 @@ class WebChannel(BaseChannel):
                     pass
             sockets.clear()
         self._connections.clear()
-        logger.info("Web channel stopped")
+        logger.info("Admin channel stopped")
 
     async def send(self, msg: OutboundMessage) -> None:
         """Push an outbound message to all connected WebSocket clients for this chat_id."""

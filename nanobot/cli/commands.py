@@ -48,7 +48,7 @@ class SafeFileHistory(FileHistory):
         super().store_string(safe)
 from nanobot.cli.stream import StreamRenderer, ThinkingSpinner
 from nanobot.config.paths import get_workspace_path, is_default_workspace
-from nanobot.config.schema import Config, WebConfig
+from nanobot.config.schema import Config, AdminConfig
 from nanobot.utils.helpers import sync_workspace_templates
 from nanobot.utils.restart import (
     consume_restart_notice_from_env,
@@ -1434,18 +1434,18 @@ def plugins_list():
     console.print(table)
 
 @app.command()
-def web(
+def admin(
     port: int = typer.Option(18080, "--port", "-p", help="Web server port"),
     host: str = typer.Option("0.0.0.0", "--host", help="Web server host"),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
-    """Start the web interface with full gateway stack.
+    """Start the admin HTTP interface with full gateway stack.
 
-    Runs the agent loop, all enabled channels (including web), cron, and
-    heartbeat services.  The web channel is force-enabled so the browser
-    can communicate via WebSocket.
+    Runs the agent loop, all enabled channels (including admin), cron, and
+    heartbeat services. The admin channel is force-enabled so external
+    callers can query runtime state and use the standalone HTTP/WebSocket API.
     """
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
@@ -1461,13 +1461,13 @@ def web(
 
     config = _load_runtime_config(config, workspace)
 
-    web_cfg = getattr(config.channels, "web", None)
-    base = web_cfg if isinstance(web_cfg, dict) else (web_cfg.model_dump() if web_cfg else {})
-    web_cfg = WebConfig(**{**base, "enabled": True, "host": host, "port": port or base.get("port", 18080)})
-    config.channels.web = web_cfg
-    port = web_cfg.port
+    admin_cfg = getattr(config.channels, "admin", None)
+    base = admin_cfg if isinstance(admin_cfg, dict) else (admin_cfg.model_dump() if admin_cfg else {})
+    admin_cfg = AdminConfig(**{**base, "enabled": True, "host": host, "port": port or base.get("port", 18080)})
+    config.channels.admin = admin_cfg
+    port = admin_cfg.port
 
-    console.print(f"{__logo__} Starting HiperOne web on {host}:{port}...")
+    console.print(f"{__logo__} Starting HiperOne admin on {host}:{port}...")
     sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
@@ -1552,7 +1552,7 @@ def web(
 
     cron.on_job = on_cron_job
 
-    # Channel manager (web channel will be created here since we set enabled=True)
+    # Channel manager (admin channel will be created here since we set enabled=True)
     channels = ChannelManager(config, bus, session_manager=session_manager, cron_service=cron)
 
     def _pick_heartbeat_target() -> tuple[str, str]:

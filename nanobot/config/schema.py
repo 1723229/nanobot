@@ -136,8 +136,8 @@ class OpenVikingConfig(Base):
     memory_recall_limit: int = 5
 
 
-class WebConfig(Base):
-    """Web channel configuration (WebSocket-based)."""
+class AdminConfig(Base):
+    """Standalone admin HTTP channel configuration."""
     enabled: bool = False
     host: str = "0.0.0.0"
     port: int = 18080

@@ -131,6 +131,25 @@ def test_onboard_help_shows_workspace_and_config_options():
     assert "--dir" not in stripped_output
 
 
+def test_root_help_lists_web_and_admin_commands():
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    stripped_output = _strip_ansi(result.stdout)
+    assert "web" in stripped_output
+    assert "embedded webui" in stripped_output
+    assert "admin" in stripped_output
+    assert "admin HTTP interface" in stripped_output
+
+
+def test_admin_help_shows_admin_command_text():
+    result = runner.invoke(app, ["admin", "--help"])
+
+    assert result.exit_code == 0
+    stripped_output = _strip_ansi(result.stdout)
+    assert "Start the admin HTTP interface with full gateway stack." in stripped_output
+
+
 def test_onboard_interactive_discard_does_not_save_or_create_workspace(mock_paths, monkeypatch):
     config_file, workspace_dir, _ = mock_paths
 
