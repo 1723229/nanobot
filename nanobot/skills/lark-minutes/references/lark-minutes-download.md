@@ -104,7 +104,7 @@ API 限流 5 次/秒，批量下载时需注意控制频率。
 | 妙记尚未准备好 | 2091003 | 转写未完成 | 等待转写完成后重试 |
 | 资源已删除 | 2091004 | 妙记已被删除 | 确认妙记文件仍然存在 |
 | 权限不足 | 2091005 | 无阅读权限 | 检查是否有该妙记的访问权限 |
-| `missing required scope(s)` | — | 应用缺少权限 | 按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "minutes:minutes.media:export"`，提取 `auth_url` 并返回给用户；不要让最终用户执行命令 |
+| `missing required scope(s)` | — | 应用缺少权限 | 按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "minutes:minutes.media:export" --timeout 30`，提取 `auth_url` 并返回给用户；不要让最终用户执行命令 |
 
 ## 提示
 

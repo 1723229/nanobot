@@ -80,6 +80,6 @@ lark-cli api POST /open-apis/xxx --data '{...}'
 ## 关键原则
 
 - **description 决定触发** — 包含功能关键词 + "当用户需要...时使用"
-- **认证** — 说明所需 scope，并明确要求 agent 按共享规则在后台通过 `python <skill_dir>/scripts/auth_link.py login --domain <name>` 或 `python <skill_dir>/scripts/auth_link.py login --scope "<scope>"` 发起授权、仅向用户返回授权链接，不要让最终用户执行命令
+- **认证** — 说明所需 scope，并明确要求 agent 按共享规则在后台通过 `python <skill_dir>/scripts/auth_link.py login --domain <name> --timeout 30` 或 `python <skill_dir>/scripts/auth_link.py login --scope "<scope>" --timeout 30` 发起授权、仅向用户返回授权链接，不要让最终用户执行命令
 - **安全** — 写入操作前确认用户意图，建议 `--dry-run` 预览
 - **编排** — 说明数据传递、失败回滚、可并行步骤

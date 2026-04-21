@@ -110,7 +110,7 @@ minutes +download --minute-token <minute_token>
 | `no recording available` | 该会议无录制或录制未完成 | 确认会议已结束且开启了录制 |
 | `121005 no permission` | 无权查看该会议录制 | 确认是会议参与者或有录制权限 |
 | `124002 recording generating` | 录制文件仍在生成中 | 等待录制完成后重试 |
-| `missing required scope(s)` | 权限不足 | 按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "<missing_scope>"` 并返回 `auth_url`；优先使用错误里的 `permission_violations` 作为 scope |
+| `missing required scope(s)` | 权限不足 | 按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "<missing_scope>" --timeout 30` 并返回 `auth_url`；优先使用错误里的 `permission_violations` 作为 scope |
 
 ## 提示
 

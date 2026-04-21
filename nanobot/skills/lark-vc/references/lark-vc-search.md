@@ -79,7 +79,7 @@ lark-cli vc +search --query "周会" --format json
 
 ### 3. 仅支持 user 身份
 
-该接口仅支持 `user` 身份。如当前用户授权缺失、过期或缺少 `vc:meeting.search:read`，按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "vc:meeting.search:read"`，提取 `auth_url` 并把该链接发给用户点击；不要让最终用户执行命令。
+该接口仅支持 `user` 身份。如当前用户授权缺失、过期或缺少 `vc:meeting.search:read`，按 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 的共享认证规则在后台执行 `python <skill_dir>/scripts/auth_link.py login --scope "vc:meeting.search:read" --timeout 30`，提取 `auth_url` 并把该链接发给用户点击；不要让最终用户执行命令。
 
 ### 4. 支持分页
 
