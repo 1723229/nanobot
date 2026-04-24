@@ -15,7 +15,7 @@ from loguru import logger
 
 from nanobot.agent.memory import MemoryStore
 from nanobot.agent.skills import SkillsLoader
-from nanobot.utils.helpers import build_assistant_message, current_time_str, detect_image_mime
+from nanobot.utils.helpers import build_assistant_message, current_time_str, detect_image_mime, truncate_text
 from nanobot.utils.prompt_templates import render_template
 
 if TYPE_CHECKING:
@@ -30,6 +30,7 @@ class ContextBuilder:
     _MAX_RECENT_HISTORY = 50
     _VIKING_TIMEOUT = 5.0       # seconds before giving up on a Viking API call
     _PROFILE_CACHE_TTL = 300.0  # seconds to reuse a cached user profile
+    _MAX_HISTORY_CHARS = 32_000  # hard cap on recent history section size
     _RUNTIME_CONTEXT_END = "[/Runtime Context]"
 
     def __init__(
@@ -100,9 +101,11 @@ class ContextBuilder:
         entries = self.memory.read_unprocessed_history(since_cursor=self.memory.get_last_dream_cursor())
         if entries:
             capped = entries[-self._MAX_RECENT_HISTORY:]
-            parts.append("# Recent History\n\n" + "\n".join(
+            history_text = "\n".join(
                 f"- [{e['timestamp']}] {e['content']}" for e in capped
-            ))
+            )
+            history_text = truncate_text(history_text, self._MAX_HISTORY_CHARS)
+            parts.append("# Recent History\n\n" + history_text)
 
         return "\n\n---\n\n".join(parts)
 
