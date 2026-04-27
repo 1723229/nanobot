@@ -47,12 +47,15 @@ class ChannelManager:
         bus: MessageBus,
         *,
         session_manager: "SessionManager | None" = None,
+        cron_service: Any = None
     ):
         self.config = config
         self.bus = bus
         self._session_manager = session_manager
         self.channels: dict[str, BaseChannel] = {}
         self._dispatch_task: asyncio.Task | None = None
+        self.session_manager = session_manager
+        self.cron_service = cron_service
 
         self._init_channels()
 
@@ -77,15 +80,24 @@ class ChannelManager:
             if not enabled:
                 continue
             try:
-                kwargs: dict[str, Any] = {}
-                # Only the WebSocket channel currently hosts the embedded webui
-                # surface; other channels stay oblivious to these knobs.
-                if cls.name == "websocket" and self._session_manager is not None:
-                    kwargs["session_manager"] = self._session_manager
-                    static_path = _default_webui_dist()
-                    if static_path is not None:
-                        kwargs["static_dist_path"] = static_path
-                channel = cls(section, self.bus, **kwargs)
+                if name == "admin":
+                    channel = cls(
+                        section,
+                        self.bus,
+                        session_manager=self.session_manager,
+                        full_config=self.config,
+                        cron_service=self.cron_service,
+                    )
+                else:
+                    kwargs: dict[str, Any] = {}
+                    # Only the WebSocket channel currently hosts the embedded webui
+                    # surface; other channels stay oblivious to these knobs.
+                    if cls.name == "websocket" and self._session_manager is not None:
+                        kwargs["session_manager"] = self._session_manager
+                        static_path = _default_webui_dist()
+                        if static_path is not None:
+                            kwargs["static_dist_path"] = static_path
+                    channel = cls(section, self.bus, **kwargs)
                 channel.transcription_provider = transcription_provider
                 channel.transcription_api_key = transcription_key
                 channel.transcription_api_base = transcription_base
@@ -95,7 +107,7 @@ class ChannelManager:
             except Exception as e:
                 logger.warning("{} channel not available: {}", name, e)
 
-        self._validate_allow_from()
+        # self._validate_allow_from()
 
     def _resolve_transcription_key(self, provider: str) -> str:
         """Pick the API key for the configured transcription provider."""

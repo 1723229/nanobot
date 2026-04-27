@@ -6,6 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
+from loguru import logger
 import yaml
 
 # Default builtin skills directory (relative to this file)
@@ -32,6 +33,42 @@ class SkillsLoader:
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
         self.disabled_skills = disabled_skills or set()
 
+    @staticmethod
+    def _normalize_channel(channel: str | None) -> str | None:
+        return channel.strip().lower() if isinstance(channel, str) and channel.strip() else None
+
+    @classmethod
+    def _channel_skill_prefixes(cls, channel: str | None) -> set[str]:
+        normalized = cls._normalize_channel(channel)
+        if normalized == "feishu":
+            return {"feishu", "lark"}
+        if normalized == "wecom":
+            return {"wecom"}
+        if normalized == "weixin":
+            return {"weixin", "wechat"}
+        if normalized == "dingtalk":
+            return {"dingtalk"}
+        return set()
+
+    @staticmethod
+    def _known_channel_skill_prefixes() -> set[str]:
+        return {"feishu", "lark", "wecom", "weixin", "wechat", "dingtalk"}
+
+    @classmethod
+    def _is_channel_skill(cls, name: str) -> bool:
+        lowered = name.lower()
+        return any(lowered.startswith(prefix) for prefix in cls._known_channel_skill_prefixes())
+
+    @classmethod
+    def _should_keep_for_channel(cls, name: str, channel: str | None) -> bool:
+        allowed_prefixes = cls._channel_skill_prefixes(channel)
+        if not allowed_prefixes:
+            return True
+        lowered = name.lower()
+        if not cls._is_channel_skill(lowered):
+            return True
+        return any(lowered.startswith(prefix) for prefix in allowed_prefixes)
+
     def _skill_entries_from_dir(self, base: Path, source: str, *, skip_names: set[str] | None = None) -> list[dict[str, str]]:
         if not base.exists():
             return []
@@ -48,7 +85,9 @@ class SkillsLoader:
             entries.append({"name": name, "path": str(skill_file), "source": source})
         return entries
 
-    def list_skills(self, filter_unavailable: bool = True) -> list[dict[str, str]]:
+    def list_skills(
+        self, filter_unavailable: bool = True, channel: str | None = None
+    ) -> list[dict[str, str]]:
         """
         List all available skills.
 
@@ -68,9 +107,24 @@ class SkillsLoader:
         if self.disabled_skills:
             skills = [s for s in skills if s["name"] not in self.disabled_skills]
 
+        skills = [s for s in skills if self._should_keep_for_channel(s["name"], channel)]
+        skills = [s for s in skills if self._skill_is_readable(s["name"])]
+
         if filter_unavailable:
             return [skill for skill in skills if self._check_requirements(self._get_skill_meta(skill["name"]))]
         return skills
+
+    def _read_skill_file(self, skill_file: Path) -> str | None:
+        """Read a skill file as UTF-8, skipping invalid files."""
+        try:
+            return skill_file.read_text(encoding="utf-8")
+        except UnicodeDecodeError as e:
+            logger.warning(f"Skipping skill {skill_file}: invalid UTF-8 ({e})")
+            return None
+
+    def _skill_is_readable(self, name: str) -> bool:
+        """Return whether the skill file can be decoded as UTF-8."""
+        return self.load_skill(name) is not None
 
     def load_skill(self, name: str) -> str | None:
         """
@@ -88,7 +142,7 @@ class SkillsLoader:
         for root in roots:
             path = root / name / "SKILL.md"
             if path.exists():
-                return path.read_text(encoding="utf-8")
+                return self._read_skill_file(path)
         return None
 
     def load_skills_for_context(self, skill_names: list[str]) -> str:
@@ -108,7 +162,7 @@ class SkillsLoader:
         ]
         return "\n\n---\n\n".join(parts)
 
-    def build_skills_summary(self, exclude: set[str] | None = None) -> str:
+    def build_skills_summary(self, exclude: set[str] | None = None, channel: str | None = None) -> str:
         """
         Build a summary of all skills (name, description, path, availability).
 
@@ -121,7 +175,7 @@ class SkillsLoader:
         Returns:
             Markdown-formatted skills summary.
         """
-        all_skills = self.list_skills(filter_unavailable=False)
+        all_skills = self.list_skills(filter_unavailable=False, channel=channel)
         if not all_skills:
             return ""
 
@@ -200,11 +254,11 @@ class SkillsLoader:
         raw_meta = self.get_skill_metadata(name) or {}
         return self._parse_nanobot_metadata(raw_meta.get("metadata"))
 
-    def get_always_skills(self) -> list[str]:
+    def get_always_skills(self, channel: str | None = None) -> list[str]:
         """Get skills marked as always=true that meet requirements."""
         return [
             entry["name"]
-            for entry in self.list_skills(filter_unavailable=True)
+            for entry in self.list_skills(filter_unavailable=True, channel=channel)
             if (meta := self.get_skill_metadata(entry["name"]) or {})
             and (
                 self._parse_nanobot_metadata(meta.get("metadata")).get("always")
@@ -240,3 +294,77 @@ class SkillsLoader:
         for key, value in parsed.items():
             metadata[str(key)] = value
         return metadata
+
+    # ------------------------------------------------------------------
+    # Source-aware catalog extensions
+    # ------------------------------------------------------------------
+
+    ALLOWED_SUPPORTING_DIRS = frozenset({"references", "templates", "scripts", "assets"})
+
+    def find_skill_dir(self, name: str) -> tuple[Path, str] | None:
+        """Locate a skill directory and return ``(path, source)``."""
+        ws = self.workspace_skills / name
+        if ws.is_dir() and (ws / "SKILL.md").exists():
+            return ws, "workspace"
+        if self.builtin_skills:
+            bi = self.builtin_skills / name
+            if bi.is_dir() and (bi / "SKILL.md").exists():
+                return bi, "builtin"
+        return None
+
+    def is_mutable(self, name: str) -> bool:
+        """A skill is mutable when it lives in the workspace directory."""
+        result = self.find_skill_dir(name)
+        if result is None:
+            return False
+        return result[1] == "workspace"
+
+    def list_supporting_files(self, name: str) -> dict[str, list[str]]:
+        """Return supporting files grouped by subdirectory."""
+        result = self.find_skill_dir(name)
+        if result is None:
+            return {}
+        skill_dir = result[0]
+        grouped: dict[str, list[str]] = {}
+        for subdir in sorted(self.ALLOWED_SUPPORTING_DIRS):
+            sub_path = skill_dir / subdir
+            if not sub_path.is_dir():
+                continue
+            files = [
+                f.relative_to(skill_dir).as_posix()
+                for f in sub_path.rglob("*")
+                if f.is_file()
+            ]
+            if files:
+                grouped[subdir] = sorted(files)
+        return grouped
+
+    def load_skill_file(self, name: str, relative_path: str) -> str | None:
+        """Load a supporting file within a skill directory.
+
+        Only files under :attr:`ALLOWED_SUPPORTING_DIRS` are accessible.
+        Returns ``None`` if the file does not exist or the path is invalid.
+        """
+        result = self.find_skill_dir(name)
+        if result is None:
+            return None
+        skill_dir = result[0]
+
+        normalized = Path(relative_path)
+        if not normalized.parts or normalized.parts[0] not in self.ALLOWED_SUPPORTING_DIRS:
+            return None
+        if ".." in normalized.parts:
+            return None
+
+        target = (skill_dir / normalized).resolve()
+        try:
+            target.relative_to(skill_dir.resolve())
+        except ValueError:
+            return None
+
+        if not target.is_file():
+            return None
+        try:
+            return target.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            return None

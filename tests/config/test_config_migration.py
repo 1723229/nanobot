@@ -205,6 +205,7 @@ def test_new_my_tool_keys_take_precedence_over_legacy(tmp_path) -> None:
     assert config.tools.my.allow_set is True
 
 
+
 def test_load_config_resets_ssrf_whitelist_when_next_config_is_empty(tmp_path) -> None:
     whitelisted = tmp_path / "whitelisted.json"
     whitelisted.write_text(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime as real_datetime
 from importlib.resources import files as pkg_files
@@ -214,6 +215,17 @@ def test_channel_format_hint_whatsapp(tmp_path) -> None:
     prompt = builder.build_system_prompt(channel="whatsapp")
     assert "Format Hint" in prompt
     assert "plain text only" in prompt
+
+
+def test_channel_hint_feishu(tmp_path) -> None:
+    """Feishu should get a channel hint that forbids pushing lark-cli commands to users."""
+    workspace = _make_workspace(tmp_path)
+    builder = ContextBuilder(workspace)
+
+    prompt = asyncio.run(builder.build_system_prompt(channel="feishu"))
+    assert "Channel Hint" in prompt
+    assert "return links only" in prompt
+    assert "lark-cli" in prompt
 
 
 def test_channel_format_hint_absent_for_unknown(tmp_path) -> None:
