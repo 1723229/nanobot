@@ -9,7 +9,7 @@ import weakref
 import tiktoken
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Iterator
 
 from loguru import logger
 
@@ -21,6 +21,7 @@ from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.utils.gitstore import GitStore
 
 if TYPE_CHECKING:
+    from nanobot.openviking.client import VikingClient
     from nanobot.providers.base import LLMProvider
     from nanobot.session.manager import Session, SessionManager
 
@@ -220,6 +221,26 @@ class MemoryStore:
     def get_memory_context(self) -> str:
         long_term = self.read_memory()
         return f"## Long-term Memory\n{long_term}" if long_term else ""
+
+    async def get_viking_memory_context(
+        self,
+        current_message: str,
+        viking_client: VikingClient,
+    ) -> str:
+        """Fetch relevant memories from OpenViking for the current message."""
+        try:
+            return await viking_client.get_viking_memory_context(current_message)
+        except Exception as e:
+            logger.warning("OpenViking memory context failed: {}", e)
+            return ""
+
+    async def get_viking_user_profile(self, viking_client: VikingClient) -> str:
+        """Fetch user profile from OpenViking."""
+        try:
+            return await viking_client.get_viking_user_profile()
+        except Exception as e:
+            logger.warning("OpenViking user profile failed: {}", e)
+            return ""
 
     # -- history.jsonl — append-only, JSONL format ---------------------------
 
@@ -432,7 +453,7 @@ class Consolidator:
         model: str,
         sessions: SessionManager,
         context_window_tokens: int,
-        build_messages: Callable[..., list[dict[str, Any]]],
+        build_messages: Callable[..., Awaitable[list[dict[str, Any]]]],
         get_tool_definitions: Callable[[], list[dict[str, Any]]],
         max_completion_tokens: int = 4096,
         consolidation_ratio: float = 0.5,
@@ -487,7 +508,7 @@ class Consolidator:
 
         return last_boundary
 
-    def estimate_session_prompt_tokens(
+    async def estimate_session_prompt_tokens(
         self,
         session: Session,
         *,
@@ -496,7 +517,7 @@ class Consolidator:
         """Estimate current prompt size for the normal session history view."""
         history = session.get_history(max_messages=0, include_timestamps=True)
         channel, chat_id = (session.key.split(":", 1) if ":" in session.key else (None, None))
-        probe_messages = self._build_messages(
+        probe_messages = await self._build_messages(
             history=history,
             current_message="[token-probe]",
             channel=channel,
@@ -583,7 +604,7 @@ class Consolidator:
             budget = self._input_token_budget
             target = int(budget * self.consolidation_ratio)
             try:
-                estimated, source = self.estimate_session_prompt_tokens(
+                estimated, source = await self.estimate_session_prompt_tokens(
                     session,
                     session_summary=session_summary,
                 )
@@ -648,7 +669,7 @@ class Consolidator:
                     break
 
                 try:
-                    estimated, source = self.estimate_session_prompt_tokens(
+                    estimated, source = await self.estimate_session_prompt_tokens(
                         session,
                         session_summary=session_summary,
                     )
@@ -730,12 +751,12 @@ class Dream:
 
     def _build_tools(self) -> ToolRegistry:
         """Build a minimal tool registry for the Dream agent."""
+        from nanobot.agent.skill_evo.integration import build_dream_skill_tools
         from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-        from nanobot.agent.tools.filesystem import EditFileTool, ReadFileTool, WriteFileTool
+        from nanobot.agent.tools.filesystem import EditFileTool, ReadFileTool
 
         tools = ToolRegistry()
         workspace = self.store.workspace
-        # Allow reading builtin skills for reference during skill creation
         extra_read = [BUILTIN_SKILLS_DIR] if BUILTIN_SKILLS_DIR.exists() else None
         tools.register(ReadFileTool(
             workspace=workspace,
@@ -743,11 +764,12 @@ class Dream:
             extra_allowed_dirs=extra_read,
         ))
         tools.register(EditFileTool(workspace=workspace, allowed_dir=workspace))
-        # write_file resolves relative paths from workspace root, but can only
-        # write under skills/ so the prompt can safely use skills/<name>/SKILL.md.
-        skills_dir = workspace / "skills"
-        skills_dir.mkdir(parents=True, exist_ok=True)
-        tools.register(WriteFileTool(workspace=workspace, allowed_dir=skills_dir))
+
+        skill_tools = build_dream_skill_tools(workspace)
+        for name in skill_tools.tool_names:
+            tool = skill_tools.get(name)
+            if tool is not None:
+                tools.register(tool)
         return tools
 
     # -- skill listing --------------------------------------------------------

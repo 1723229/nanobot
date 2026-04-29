@@ -95,6 +95,8 @@ class Session:
                     start = i - 1
                 sliced = sliced[start:]
                 break
+        else:
+            sliced = []
 
         # Drop orphan tool results at the front.
         start = find_legal_message_start(sliced)
@@ -155,6 +157,17 @@ class Session:
                 kept = kept[start:]
             out = kept
         return out
+
+    def clone(self) -> "Session":
+        """Return a shallow copy with an independent messages list."""
+        return Session(
+            key=self.key,
+            messages=list(self.messages),
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            metadata=dict(self.metadata),
+            last_consolidated=self.last_consolidated,
+        )
 
     def clear(self) -> None:
         """Clear all messages and reset session to initial state."""
@@ -258,7 +271,7 @@ class SessionManager:
         return self.sessions_dir / f"{self.safe_key(key)}.jsonl"
 
     def _get_legacy_session_path(self, key: str) -> Path:
-        """Legacy global session path (~/.nanobot/sessions/)."""
+        """Legacy global session path (~/.hiperone/sessions/)."""
         return self.legacy_sessions_dir / f"{self.safe_key(key)}.jsonl"
 
     def get_or_create(self, key: str) -> Session:
