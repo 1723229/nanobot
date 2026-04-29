@@ -70,7 +70,7 @@ class SkillsConfig(Base):
 
     enabled: bool = True
     review_enabled: bool = True
-    review_mode: Literal["off", "suggest", "auto_patch", "auto_create"] = "auto_create"
+    review_mode: Literal["suggest", "auto_patch", "auto_all"] = "auto_all"
     review_trigger_iterations: int = 10
     review_min_tool_calls: int = 5
     review_max_iterations: int = 8

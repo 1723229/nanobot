@@ -768,7 +768,7 @@ class TestTrustInference:
 
 
 class TestSkillReviewService:
-    def _make_svc(self, review_mode: str = "auto_create"):
+    def _make_svc(self, review_mode: str = "auto_all"):
         from nanobot.agent.skill_evo.skill_review import SkillReviewService
         from nanobot.config.schema import SkillsConfig
 
@@ -807,11 +807,12 @@ class TestSkillReviewService:
         assert "web-scraper" in header
         assert "used 10 times" in header
 
-    def test_auto_create_tools_allow_create(self):
-        svc = self._make_svc("auto_create")
+    def test_auto_all_tools_allow_create_and_patch(self):
+        svc = self._make_svc("auto_all")
         tools = svc._build_tools()
         manage = tools.get("skill_manage")
         assert manage._config.allow_create is True
+        assert manage._config.allow_patch is True
 
     def test_auto_patch_tools_block_create(self):
         svc = self._make_svc("auto_patch")

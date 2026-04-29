@@ -234,20 +234,20 @@ class TestReviewMetadata:
 
 
 class TestReviewMode:
-    def test_default_review_config_enables_auto_create_notifications(self):
+    def test_default_review_config_enables_auto_all_notifications(self):
         from nanobot.config.schema import SkillsConfig
 
         config = SkillsConfig()
         assert config.review_enabled is True
-        assert config.review_mode == "auto_create"
+        assert config.review_mode == "auto_all"
         assert config.notify_user_on_change is True
 
     @pytest.mark.asyncio
-    async def test_auto_create_allows_create(self):
+    async def test_auto_all_allows_create_and_patch(self):
         from nanobot.config.schema import SkillsConfig
         from nanobot.agent.skill_evo.skill_review import SkillReviewService
 
-        config = SkillsConfig(review_mode="auto_create", review_enabled=True)
+        config = SkillsConfig(review_mode="auto_all", review_enabled=True)
         provider = MagicMock()
         store = MagicMock()
         store.get_usage_summary.return_value = []
@@ -259,6 +259,7 @@ class TestReviewMode:
         manage = tools.get("skill_manage")
         assert manage is not None
         assert manage._config.allow_create is True
+        assert manage._config.allow_patch is True
 
     @pytest.mark.asyncio
     async def test_auto_patch_blocks_create(self):
